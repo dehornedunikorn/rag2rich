@@ -30,6 +30,7 @@ interface GameState {
   setItemCondition: (id: string, condition: number) => void;
   setItemPhoto: (id: string, quality: number) => void;
   markWashed: (id: string) => void;
+  markIroned: (id: string) => void;
   markPhotographed: (id: string) => void;
   listItem: (id: string, price: number) => void;
   unlistItem: (listingId: string) => void;
@@ -125,6 +126,7 @@ export const useGame = create<GameState>()(
           condition: 25 + Math.random() * 25,
           photoQuality: 0,
           washed: false,
+          ironed: false,
           photographed: false,
         };
         const newRemaining = Math.max(0, ab.remainingWeight - t.weight);
@@ -151,6 +153,9 @@ export const useGame = create<GameState>()(
 
       markWashed: (id) =>
         set((s) => ({ inventory: s.inventory.map((i) => (i.id === id ? { ...i, washed: true } : i)) })),
+
+      markIroned: (id) =>
+        set((s) => ({ inventory: s.inventory.map((i) => (i.id === id ? { ...i, ironed: true } : i)) })),
 
       markPhotographed: (id) =>
         set((s) => ({ inventory: s.inventory.map((i) => (i.id === id ? { ...i, photographed: true } : i)) })),

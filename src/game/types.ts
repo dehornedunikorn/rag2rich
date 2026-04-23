@@ -35,6 +35,7 @@ export interface InventoryItem {
   condition: number;     // 0-100
   photoQuality: number;  // 0-100
   washed: boolean;
+  ironed: boolean;
   photographed: boolean;
 }
 

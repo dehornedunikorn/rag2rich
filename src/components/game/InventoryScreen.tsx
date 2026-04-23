@@ -1,5 +1,6 @@
 import { useGame, selectCapacity } from "@/game/store";
 import { InventoryItem } from "@/game/types";
+import { ITEM_IMAGES } from "@/game/itemImages";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
 import { cn } from "@/lib/utils";

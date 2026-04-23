@@ -40,11 +40,20 @@ export const InventoryScreen = ({ onSelectItem }: { onSelectItem: (item: Invento
             >
               <div className="flex items-center justify-between">
                 <RarityBadge rarity={item.rarity} />
-                {item.washed && item.photographed && (
+                {item.washed && item.ironed && item.photographed && (
                   <span className="text-[10px] text-success" title="Ready"><Sparkles className="h-3 w-3" /></span>
                 )}
               </div>
-              <div className="flex-1 grid place-items-center text-5xl">{item.emoji}</div>
+              <div className="flex-1 grid place-items-center overflow-hidden my-1">
+                <img
+                  src={ITEM_IMAGES[item.kind]}
+                  alt={item.name}
+                  width={512}
+                  height={512}
+                  loading="lazy"
+                  className="h-full w-full object-contain rounded-lg"
+                />
+              </div>
               <div>
                 <p className="text-[11px] font-semibold leading-tight truncate">{item.name}</p>
                 <StatBar value={item.condition} color={item.condition > 70 ? "success" : "warning"} className="mt-1" />

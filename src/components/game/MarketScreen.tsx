@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "@/game/store";
 import { InventoryItem } from "@/game/types";
+import { ITEM_IMAGES } from "@/game/itemImages";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
 import { Coins, Tag, Undo2, X } from "lucide-react";

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGame } from "@/game/store";
 import { InventoryItem } from "@/game/types";
+import { ITEM_IMAGES } from "@/game/itemImages";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
 import { Coins, Tag, Undo2, X } from "lucide-react";
@@ -58,8 +59,15 @@ export const MarketScreen = ({
             const fairColor = ratio > 0.85 ? "text-success" : ratio > 0.55 ? "text-warning" : "text-destructive";
             return (
               <li key={l.id} className="rounded-2xl bg-gradient-surface border border-border p-3 flex items-center gap-3 animate-scale-in">
-                <div className="h-14 w-14 rounded-xl bg-gradient-bale grid place-items-center text-3xl border border-border shrink-0">
-                  {l.item.emoji}
+                <div className="h-14 w-14 rounded-xl overflow-hidden border border-border shrink-0 bg-card">
+                  <img
+                    src={ITEM_IMAGES[l.item.kind]}
+                    alt={l.item.name}
+                    width={512}
+                    height={512}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -118,7 +126,16 @@ const ListItemDialog = ({
       >
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-14 w-14 rounded-xl bg-gradient-bale grid place-items-center text-3xl border border-border">{item.emoji}</div>
+            <div className="h-14 w-14 rounded-xl overflow-hidden border border-border bg-card">
+              <img
+                src={ITEM_IMAGES[item.kind]}
+                alt={item.name}
+                width={512}
+                height={512}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            </div>
             <div>
               <h3 className="font-display font-bold">List {item.name}</h3>
               <p className="text-xs text-muted-foreground">Base value: {item.baseValue}c</p>

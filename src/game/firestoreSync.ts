@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -10,13 +10,27 @@ const PERSIST_KEYS = [
   "discoveredDesigners", "freeUploads", "webshopUnlocked",
 ] as const;
 
-type PersistShape = Pick<ReturnType<typeof useGame.getState>, typeof PERSIST_KEYS[number]>;
+type GS = ReturnType<typeof useGame.getState>;
+type PersistShape = Pick<GS, typeof PERSIST_KEYS[number]>;
 
-const pickPersist = (s: ReturnType<typeof useGame.getState>): PersistShape =>
+const pickPersist = (s: GS): PersistShape =>
   PERSIST_KEYS.reduce((acc, k) => {
     (acc as any)[k] = s[k];
     return acc;
   }, {} as PersistShape);
+
+export function useFirebaseUser() {
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setReady(true);
+    });
+    return () => unsub();
+  }, []);
+  return { user, ready };
+}
 
 /**
  * Mirrors local game state to Firestore for the signed-in user.
@@ -38,7 +52,6 @@ export function useFirestoreSync(user: User | null) {
           useGame.getState().hydrate(remote as any);
           lastPushed.current = JSON.stringify(remote);
         } else {
-          // first-time user — seed remote with current local state
           const local = pickPersist(useGame.getState());
           await setDoc(doc(db, "players", user.uid), local);
           lastPushed.current = JSON.stringify(local);
@@ -70,16 +83,4 @@ export function useFirestoreSync(user: User | null) {
       if (timer) clearTimeout(timer);
     };
   }, [user]);
-}
-
-export function useFirebaseUser() {
-  const ref = useRef<User | null>(null);
-  const [, force] = (require("react") as typeof import("react")).useReducer((x: number) => x + 1, 0);
-  useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      ref.current = u;
-      force();
-    });
-  }, []);
-  return ref.current;
 }

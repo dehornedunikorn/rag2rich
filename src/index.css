@@ -41,6 +41,10 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 270 20% 96%;
 
+    /* Designer / gold tier */
+    --gold: 45 95% 55%;
+    --gold-foreground: 40 60% 12%;
+
     --border: 252 14% 20%;
     --input: 252 14% 18%;
     --ring: 280 95% 62%;

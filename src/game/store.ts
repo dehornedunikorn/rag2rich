@@ -3,7 +3,10 @@ import { persist } from "zustand/middleware";
 import {
   BALES, BaleDef, InventoryItem, ITEM_TEMPLATES, ItemTemplate, Listing,
   StorageTier, STORAGE_TIERS, UPGRADES, UpgradeKey,
+  MARKET_LISTING_FEE, WEBSHOP_COST, WEBSHOP_REQUIRED_REP_PCT, WEBSHOP_SALE_SPEED_BONUS,
 } from "./types";
+import { DESIGNER_ITEMS, DESIGNER_BY_ID } from "./designer";
+import { variantCount } from "./itemImages";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -23,6 +26,15 @@ interface GameState {
   upgradeLevels: Record<UpgradeKey, number>;
   activeBale: ActiveBale | null;
 
+  // Designer collection: ids the player has ever discovered
+  discoveredDesigners: string[];
+
+  // Marketplace freebies (granted by random "Marketplace Gift")
+  freeUploads: number;
+
+  // Webshop
+  webshopUnlocked: boolean;
+
   // actions
   buyBale: (id: string) => boolean;
   clickBale: () => InventoryItem | null;
@@ -32,18 +44,25 @@ interface GameState {
   markWashed: (id: string) => void;
   markIroned: (id: string) => void;
   markPhotographed: (id: string) => void;
-  listItem: (id: string, price: number) => void;
+  listItem: (id: string, price: number) => { ok: boolean; reason?: string };
   unlistItem: (listingId: string) => void;
   tickMarket: () => void;
   upgradeStorage: (tier: StorageTier) => boolean;
   upgrade: (key: UpgradeKey) => boolean;
   reset: () => void;
+
+  // new
+  grantFreeUploads: (n: number) => void;
+  unlockWebshop: () => boolean;
+  awardDesigner: (designerId?: string) => InventoryItem | null;
+  repairAllInventory: () => number;
+  sellTopListings: (count: number) => { sold: number; earned: number };
+  hydrate: (partial: Partial<GameState>) => void;
 }
 
 const capacity = (tier: StorageTier) => STORAGE_TIERS[tier].capacity;
 
 const pickTemplate = (boost: number): ItemTemplate => {
-  // Weight rarity → smaller weight to common when boost low
   const weights = ITEM_TEMPLATES.map((t) => {
     const base = t.rarity === "common" ? 50 : t.rarity === "uncommon" ? 28 : t.rarity === "rare" ? 14 : 5;
     const rarityShift = t.rarity === "common" ? -boost * 30 : t.rarity === "epic" ? boost * 25 : boost * 8;
@@ -58,6 +77,8 @@ const pickTemplate = (boost: number): ItemTemplate => {
   return ITEM_TEMPLATES[0];
 };
 
+const reputationPct = (rep: number) => (1 - (rep - 0.5) / 0.5) * 100;
+
 export const useGame = create<GameState>()(
   persist(
     (set, get) => ({
@@ -69,6 +90,9 @@ export const useGame = create<GameState>()(
       listings: [],
       upgradeLevels: { washer: 0, iron: 0, lights: 0 },
       activeBale: null,
+      discoveredDesigners: [],
+      freeUploads: 0,
+      webshopUnlocked: false,
 
       buyBale: (id) => {
         const def = BALES.find((b) => b.id === id);
@@ -86,15 +110,12 @@ export const useGame = create<GameState>()(
         if (!s.activeBale) return null;
         const ab = s.activeBale;
 
-        // capacity check
         if (s.inventory.length >= capacity(s.storageTier)) return null;
 
         let cur = ab.currentItem;
         if (!cur) {
           if (ab.remainingWeight <= 0.05) return null;
-          // pick item that fits in remaining weight (or close)
           let template = pickTemplate(ab.def.rarityBoost);
-          // if too heavy, try lighter ones
           let attempts = 0;
           while (template.weight > ab.remainingWeight + 0.4 && attempts < 6) {
             template = pickTemplate(ab.def.rarityBoost);
@@ -113,11 +134,12 @@ export const useGame = create<GameState>()(
           return null;
         }
 
-        // reveal
         const t = cur.template;
+        const variant = Math.floor(Math.random() * variantCount(t.kind));
         const item: InventoryItem = {
           id: uid(),
           kind: t.kind,
+          variant,
           name: t.name,
           emoji: t.emoji,
           weight: t.weight,
@@ -163,12 +185,21 @@ export const useGame = create<GameState>()(
       listItem: (id, price) => {
         const s = get();
         const item = s.inventory.find((i) => i.id === id);
-        if (!item) return;
+        if (!item) return { ok: false, reason: "Item not found" };
+        const useFree = s.freeUploads > 0;
+        const fee = useFree ? 0 : MARKET_LISTING_FEE;
+        if (s.coins < fee) return { ok: false, reason: `Need ${fee} coins for upload fee` };
+
         const listing: Listing = { id: uid(), item, price, listedAt: Date.now(), ticks: 0 };
         set({
+          coins: s.coins - fee,
+          freeUploads: useFree ? s.freeUploads - 1 : s.freeUploads,
+          // NOTE: items listed remain consumed from `inventory` but they still occupy
+          // marketplace slots — total occupied = inventory + listings (see selectOccupied)
           inventory: s.inventory.filter((i) => i.id !== id),
           listings: [...s.listings, listing],
         });
+        return { ok: true };
       },
 
       unlistItem: (listingId) => {
@@ -185,28 +216,26 @@ export const useGame = create<GameState>()(
       tickMarket: () => {
         const s = get();
         if (s.listings.length === 0) return;
-        const speedBoost = 1 + s.totalSales * 0.001;
+        const speedBoost = (1 + s.totalSales * 0.001) * (s.webshopUnlocked ? WEBSHOP_SALE_SPEED_BONUS : 1);
         const sold: Listing[] = [];
         const remaining: Listing[] = [];
         for (const l of s.listings) {
           const ticks = l.ticks + 1;
-          // base probability per tick
-          const priceRatio = l.item.baseValue / Math.max(1, l.price); // <1 = overpriced
+          const priceRatio = l.item.baseValue / Math.max(1, l.price);
           const condFactor = l.item.condition / 100;
           const photoFactor = 0.5 + (l.item.photoQuality / 100) * 0.5;
           const repFactor = 1 / s.reputation;
           let p = priceRatio * condFactor * photoFactor * repFactor * 0.05 * speedBoost;
           p = Math.max(0.005, Math.min(0.6, p));
-          if (Math.random() < p) {
-            sold.push(l);
-          } else {
-            remaining.push({ ...l, ticks });
-          }
+          if (Math.random() < p) sold.push(l);
+          else remaining.push({ ...l, ticks });
         }
-        if (sold.length === 0) return;
+        if (sold.length === 0) {
+          set({ listings: remaining });
+          return;
+        }
         const earned = sold.reduce((sum, l) => sum + l.price, 0);
         const newSales = s.totalSales + sold.length;
-        // Every 100 sales reduce reputation factor (lower is better) by 0.1%
         const repBoosts = Math.floor(newSales / 100) - Math.floor(s.totalSales / 100);
         const newRep = Math.max(0.5, s.reputation - repBoosts * 0.001);
         set({
@@ -221,7 +250,6 @@ export const useGame = create<GameState>()(
         const s = get();
         const target = STORAGE_TIERS[tier];
         if (s.coins < target.cost) return false;
-        // can only upgrade up
         const order: StorageTier[] = ["closet", "room", "garage", "container"];
         if (order.indexOf(tier) <= order.indexOf(s.storageTier)) return false;
         set({ coins: s.coins - target.cost, storageTier: tier });
@@ -242,15 +270,86 @@ export const useGame = create<GameState>()(
         return true;
       },
 
+      grantFreeUploads: (n) => set((s) => ({ freeUploads: s.freeUploads + n })),
+
+      unlockWebshop: () => {
+        const s = get();
+        if (s.webshopUnlocked) return false;
+        if (reputationPct(s.reputation) < WEBSHOP_REQUIRED_REP_PCT) return false;
+        if (s.coins < WEBSHOP_COST) return false;
+        set({ coins: s.coins - WEBSHOP_COST, webshopUnlocked: true });
+        return true;
+      },
+
+      awardDesigner: (designerId) => {
+        const s = get();
+        if (s.inventory.length >= capacity(s.storageTier)) return null;
+        const def = designerId
+          ? DESIGNER_BY_ID[designerId]
+          : DESIGNER_ITEMS[Math.floor(Math.random() * DESIGNER_ITEMS.length)];
+        if (!def) return null;
+        const item: InventoryItem = {
+          id: uid(),
+          kind: "jacket", // fallback kind for any sprite needs
+          designerId: def.id,
+          name: def.name,
+          emoji: def.emoji,
+          weight: def.weight,
+          baseValue: def.baseValue,
+          rarity: "designer",
+          condition: 70 + Math.random() * 25,
+          photoQuality: 0,
+          washed: false,
+          ironed: false,
+          photographed: false,
+        };
+        const discovered = s.discoveredDesigners.includes(def.id)
+          ? s.discoveredDesigners
+          : [...s.discoveredDesigners, def.id];
+        set({ inventory: [...s.inventory, item], discoveredDesigners: discovered });
+        return item;
+      },
+
+      repairAllInventory: () => {
+        const s = get();
+        let count = 0;
+        const next = s.inventory.map((i) => {
+          if (i.condition < 100) count++;
+          return { ...i, condition: 100, washed: true, ironed: true };
+        });
+        set({ inventory: next });
+        return count;
+      },
+
+      sellTopListings: (count) => {
+        const s = get();
+        if (s.listings.length === 0) return { sold: 0, earned: 0 };
+        // Sell up to `count` of the most expensive listings
+        const sorted = [...s.listings].sort((a, b) => b.price - a.price);
+        const toSell = sorted.slice(0, count);
+        const ids = new Set(toSell.map((l) => l.id));
+        const earned = toSell.reduce((sum, l) => sum + l.price, 0);
+        set({
+          listings: s.listings.filter((l) => !ids.has(l.id)),
+          coins: s.coins + earned,
+          totalSales: s.totalSales + toSell.length,
+        });
+        return { sold: toSell.length, earned };
+      },
+
+      hydrate: (partial) => set((s) => ({ ...s, ...partial })),
+
       reset: () =>
         set({
           coins: 350, reputation: 1.0, totalSales: 0, storageTier: "closet",
           inventory: [], listings: [], upgradeLevels: { washer: 0, iron: 0, lights: 0 },
-          activeBale: null,
+          activeBale: null, discoveredDesigners: [], freeUploads: 0, webshopUnlocked: false,
         }),
     }),
-    { name: "rag-to-rich-v1" }
+    { name: "rag-to-rich-v2" }
   )
 );
 
 export const selectCapacity = (s: GameState) => STORAGE_TIERS[s.storageTier].capacity;
+export const selectOccupied = (s: GameState) => s.inventory.length + s.listings.length;
+export const selectReputationPct = (s: GameState) => reputationPct(s.reputation);

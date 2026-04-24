@@ -33,7 +33,7 @@ export const StudioGallery = ({ onClose }: { onClose: () => void }) => {
               className={cn(
                 "relative aspect-square rounded-2xl border overflow-hidden tap-scale text-left",
                 isOwned
-                  ? "border-yellow-500/60 bg-gradient-to-br from-amber-950/40 to-yellow-900/20 hover:border-yellow-400"
+                  ? "border-gold/60 bg-gradient-to-br from-gold/15 to-card hover:border-gold"
                   : "border-border bg-secondary/40 cursor-not-allowed"
               )}
             >
@@ -53,13 +53,13 @@ export const StudioGallery = ({ onClose }: { onClose: () => void }) => {
                   </div>
                 )
               ) : (
-                <div className="absolute inset-0 grid place-items-center text-5xl opacity-30 grayscale">
+                <div className="absolute inset-0 grid place-items-center opacity-60">
                   <Lock className="h-7 w-7 text-muted-foreground" />
                 </div>
               )}
               {isOwned && (
-                <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-yellow-500/90 grid place-items-center">
-                  <Sparkles className="h-3 w-3 text-amber-950" />
+                <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-gold grid place-items-center">
+                  <Sparkles className="h-3 w-3 text-gold-foreground" />
                 </div>
               )}
             </button>
@@ -73,10 +73,10 @@ export const StudioGallery = ({ onClose }: { onClose: () => void }) => {
           onClick={() => setSelectedId(null)}
         >
           <div
-            className="w-full max-w-sm rounded-3xl border border-yellow-500/40 bg-card p-5 space-y-3 animate-scale-in"
+            className="w-full max-w-sm rounded-3xl border border-gold/40 bg-card p-5 space-y-3 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="aspect-square rounded-2xl overflow-hidden border border-yellow-500/30 bg-gradient-to-br from-amber-950/40 to-yellow-900/20 grid place-items-center">
+            <div className="aspect-square rounded-2xl overflow-hidden border border-gold/30 bg-gradient-to-br from-gold/15 to-card grid place-items-center">
               {selected.image ? (
                 <img
                   src={selected.image}
@@ -91,7 +91,7 @@ export const StudioGallery = ({ onClose }: { onClose: () => void }) => {
             </div>
             <div className="flex items-center justify-between">
               <h2 className="font-display font-bold text-lg">{selected.name}</h2>
-              <span className="flex items-center gap-1 text-yellow-400 text-sm font-bold tabular-nums">
+              <span className="flex items-center gap-1 text-gold text-sm font-bold tabular-nums">
                 <Coins className="h-3.5 w-3.5" /> {selected.baseValue}
               </span>
             </div>

@@ -1,8 +1,11 @@
-import { useGame } from "@/game/store";
-import { STORAGE_TIERS, StorageTier, UPGRADES } from "@/game/types";
-import { Coins, Lock } from "lucide-react";
+import { useState } from "react";
+import { useGame, selectReputationPct } from "@/game/store";
+import { STORAGE_TIERS, StorageTier, UPGRADES, WEBSHOP_COST, WEBSHOP_REQUIRED_REP_PCT } from "@/game/types";
+import { Coins, Lock, Store, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { playRewardedAd } from "@/game/ads";
+import { AdModal } from "./AdModal";
 
 const TIER_ORDER: StorageTier[] = ["closet", "room", "garage", "container"];
 
@@ -13,6 +16,12 @@ export const ShopScreen = () => {
   const upgradeLevels = useGame((s) => s.upgradeLevels);
   const upgrade = useGame((s) => s.upgrade);
   const reset = useGame((s) => s.reset);
+  const repPct = useGame(selectReputationPct);
+  const webshopUnlocked = useGame((s) => s.webshopUnlocked);
+  const unlockWebshop = useGame((s) => s.unlockWebshop);
+  const awardDesigner = useGame((s) => s.awardDesigner);
+
+  const [designerAdOpen, setDesignerAdOpen] = useState(false);
 
   return (
     <div className="px-4 py-4 space-y-6 animate-fade-in">
@@ -20,6 +29,67 @@ export const ShopScreen = () => {
         <h1 className="text-2xl font-display font-bold neon-text">Shop</h1>
         <p className="text-sm text-muted-foreground">Reinvest in your empire.</p>
       </div>
+
+      {/* Designer Drop ad button */}
+      <button
+        onClick={() => setDesignerAdOpen(true)}
+        className="w-full p-4 rounded-2xl bg-gradient-to-r from-gold/15 to-primary/15 border border-gold/40 tap-scale flex items-center gap-3"
+      >
+        <div className="h-12 w-12 rounded-xl bg-gold grid place-items-center text-gold-foreground">
+          <Sparkles className="h-6 w-6" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="font-display font-bold">Designer Drop</p>
+          <p className="text-xs text-muted-foreground">Watch a 30s ad for 1 random Designer item.</p>
+        </div>
+        <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Ad</span>
+      </button>
+
+      {/* Webshop unlock */}
+      <section className="space-y-2">
+        <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Own Webshop</h2>
+        <div className={cn(
+          "rounded-2xl p-4 border flex items-center gap-3",
+          webshopUnlocked ? "bg-gold/10 border-gold/40" : "bg-gradient-surface border-border"
+        )}>
+          <div className={cn(
+            "h-12 w-12 rounded-xl border grid place-items-center",
+            webshopUnlocked ? "bg-gold text-gold-foreground border-gold" : "bg-secondary border-border"
+          )}>
+            <Store className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <p className="font-display font-bold">My Webshop</p>
+            <p className="text-xs text-muted-foreground">No listing fees · 15% faster sales.</p>
+            {!webshopUnlocked && (
+              <p className="text-[11px] mt-1 text-muted-foreground">
+                Requires {WEBSHOP_REQUIRED_REP_PCT}% reputation. You're at {repPct.toFixed(0)}%.
+              </p>
+            )}
+          </div>
+          {webshopUnlocked ? (
+            <span className="text-[10px] text-gold font-bold uppercase tracking-widest">Owned</span>
+          ) : (
+            <button
+              onClick={() => {
+                if (unlockWebshop()) toast.success("Webshop unlocked!");
+                else if (repPct < WEBSHOP_REQUIRED_REP_PCT) toast.error(`Need ${WEBSHOP_REQUIRED_REP_PCT}% reputation`);
+                else toast.error("Not enough coins");
+              }}
+              disabled={repPct < WEBSHOP_REQUIRED_REP_PCT || coins < WEBSHOP_COST}
+              className={cn(
+                "px-3 h-10 rounded-xl font-bold text-sm tap-scale flex items-center gap-1",
+                repPct >= WEBSHOP_REQUIRED_REP_PCT && coins >= WEBSHOP_COST
+                  ? "bg-gradient-primary text-primary-foreground shadow-neon"
+                  : "bg-secondary text-muted-foreground"
+              )}
+            >
+              {repPct < WEBSHOP_REQUIRED_REP_PCT && <Lock className="h-3.5 w-3.5" />}
+              <Coins className="h-3.5 w-3.5" /> {WEBSHOP_COST}
+            </button>
+          )}
+        </div>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">Storage</h2>
@@ -46,7 +116,7 @@ export const ShopScreen = () => {
                     <p className="font-display font-bold">{tier.name}</p>
                     {owned && <span className="text-[10px] text-success font-bold">OWNED</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground">Capacity: {tier.capacity} items</p>
+                  <p className="text-xs text-muted-foreground">Capacity: {tier.capacity} slots</p>
                 </div>
                 {!owned && (
                   <button
@@ -123,6 +193,21 @@ export const ShopScreen = () => {
       >
         Reset progress
       </button>
+
+      <AdModal
+        open={designerAdOpen}
+        title="Designer Drop"
+        duration={5}
+        rewardLabel="1 random Designer item"
+        onComplete={async () => {
+          await playRewardedAd("designer_drop");
+          setDesignerAdOpen(false);
+          const got = awardDesigner();
+          if (got) toast.success(`Designer Drop! ${got.name}`, { description: "Check your closet" });
+          else toast.error("No room — upgrade storage first");
+        }}
+        onSkip={() => setDesignerAdOpen(false)}
+      />
     </div>
   );
 };

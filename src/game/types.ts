@@ -24,14 +24,18 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { kind: "coat",     name: "Wool Coat",   emoji: "🧥", weight: 1.6, baseValue: 220, rarity: "epic",     clicksToReveal: 6 },
 ];
 
+export type Rarity = "common" | "uncommon" | "rare" | "epic" | "designer";
+
 export interface InventoryItem {
   id: string;
   kind: ItemKind;
+  variant?: number;          // 0..4 — which of 5 photos to use
+  designerId?: string;       // present if this is a Designer-tier item
   name: string;
   emoji: string;
   weight: number;
   baseValue: number;
-  rarity: ItemTemplate["rarity"];
+  rarity: Rarity;
   condition: number;     // 0-100
   photoQuality: number;  // 0-100
   washed: boolean;
@@ -50,10 +54,10 @@ export interface Listing {
 export type StorageTier = "closet" | "room" | "garage" | "container";
 
 export const STORAGE_TIERS: Record<StorageTier, { name: string; capacity: number; cost: number; emoji: string }> = {
-  closet:    { name: "Closet",    capacity: 15,  cost: 0,    emoji: "🚪" },
-  room:      { name: "Room",      capacity: 80,  cost: 800,  emoji: "🛏️" },
-  garage:    { name: "Garage",    capacity: 180, cost: 3500, emoji: "🚗" },
-  container: { name: "Container", capacity: 380, cost: 12000, emoji: "📦" },
+  closet:    { name: "Closet",    capacity: 15,  cost: 0,     emoji: "🚪" },
+  room:      { name: "Room",      capacity: 30,  cost: 5000,  emoji: "🛏️" },
+  garage:    { name: "Garage",    capacity: 100, cost: 12000, emoji: "🚗" },
+  container: { name: "Container", capacity: 200, cost: 25000, emoji: "📦" },
 };
 
 export type UpgradeKey = "washer" | "iron" | "lights";
@@ -71,9 +75,9 @@ export const UPGRADES: UpgradeDef[] = [
     description: "Widens the wash mini-game green zone.",
     levels: [
       { cost: 0,    bonus: 0,    label: "Hand wash" },
-      { cost: 250,  bonus: 0.06, label: "Basic Washer" },
-      { cost: 1200, bonus: 0.12, label: "Pro Washer" },
-      { cost: 4000, bonus: 0.20, label: "Industrial" },
+      { cost: 250,  bonus: 0.04, label: "Basic Washer" },
+      { cost: 1200, bonus: 0.08, label: "Pro Washer" },
+      { cost: 4000, bonus: 0.14, label: "Industrial" },
     ],
   },
   {
@@ -112,3 +116,9 @@ export const BALES: BaleDef[] = [
   { id: "vintage", name: "Vintage Bale",   cost: 480,  weight: 15, rarityBoost: 0.25, description: "Higher chance of rare finds." },
   { id: "premium", name: "Premium Bale",   cost: 1500, weight: 15, rarityBoost: 0.5,  description: "Stuffed with epic gear." },
 ];
+
+// Marketplace economy
+export const MARKET_LISTING_FEE = 5;            // coins per upload
+export const WEBSHOP_COST = 5000;               // unlock cost
+export const WEBSHOP_REQUIRED_REP_PCT = 30;     // % reputation needed to unlock
+export const WEBSHOP_SALE_SPEED_BONUS = 1.15;   // 15% faster

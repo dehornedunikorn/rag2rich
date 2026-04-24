@@ -1,25 +1,49 @@
-import { useGame, selectCapacity } from "@/game/store";
+import { useGame, selectCapacity, selectOccupied } from "@/game/store";
 import { InventoryItem } from "@/game/types";
-import { ITEM_IMAGES } from "@/game/itemImages";
+import { getItemImage } from "@/game/itemImages";
+import { DESIGNER_BY_ID } from "@/game/designer";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
 import { cn } from "@/lib/utils";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Image as ImageIcon } from "lucide-react";
 
-export const InventoryScreen = ({ onSelectItem }: { onSelectItem: (item: InventoryItem) => void }) => {
+export const InventoryScreen = ({
+  onSelectItem,
+  onOpenGallery,
+}: {
+  onSelectItem: (item: InventoryItem) => void;
+  onOpenGallery: () => void;
+}) => {
   const inventory = useGame((s) => s.inventory);
   const cap = useGame(selectCapacity);
+  const occupied = useGame(selectOccupied);
+
+  const imgFor = (item: InventoryItem) => {
+    if (item.designerId) {
+      const d = DESIGNER_BY_ID[item.designerId];
+      return d?.image ?? null;
+    }
+    return getItemImage(item.kind, item.variant);
+  };
 
   return (
     <div className="px-4 py-4 space-y-4 animate-fade-in">
-      <div className="flex items-end justify-between">
-        <div>
+      <div className="flex items-end justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-display font-bold neon-text">Your Closet</h1>
-          <p className="text-sm text-muted-foreground tabular-nums">{inventory.length} / {cap} items</p>
+          <p className="text-sm text-muted-foreground tabular-nums">
+            {occupied} / {cap} slots · {inventory.length} in closet
+          </p>
         </div>
+        <button
+          onClick={onOpenGallery}
+          className="px-3 py-1.5 rounded-full bg-gold/15 border border-gold/40 text-gold text-xs font-bold tap-scale flex items-center gap-1 shrink-0"
+        >
+          <ImageIcon className="h-3 w-3" /> Gallery
+        </button>
       </div>
 
-      <StatBar value={(inventory.length / cap) * 100} color={inventory.length >= cap ? "warning" : "primary"} />
+      <StatBar value={(occupied / cap) * 100} color={occupied >= cap ? "warning" : "primary"} />
 
       {inventory.length === 0 ? (
         <div className="text-center py-16 px-6 rounded-2xl border border-dashed border-border bg-card/40">
@@ -29,37 +53,47 @@ export const InventoryScreen = ({ onSelectItem }: { onSelectItem: (item: Invento
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3">
-          {inventory.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => onSelectItem(item)}
-              className={cn(
-                "relative aspect-square rounded-2xl bg-gradient-surface border border-border p-2 tap-scale text-left",
-                "hover:border-primary/50 transition-colors flex flex-col"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <RarityBadge rarity={item.rarity} />
-                {item.washed && item.ironed && item.photographed && (
-                  <span className="text-[10px] text-success" title="Ready"><Sparkles className="h-3 w-3" /></span>
+          {inventory.map((item) => {
+            const img = imgFor(item);
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelectItem(item)}
+                className={cn(
+                  "relative aspect-square rounded-2xl bg-gradient-surface border p-2 tap-scale text-left",
+                  "transition-colors flex flex-col",
+                  item.rarity === "designer"
+                    ? "border-gold/60 hover:border-gold shadow-[0_0_12px_hsl(var(--gold)/0.25)]"
+                    : "border-border hover:border-primary/50"
                 )}
-              </div>
-              <div className="flex-1 grid place-items-center overflow-hidden my-1">
-                <img
-                  src={ITEM_IMAGES[item.kind]}
-                  alt={item.name}
-                  width={512}
-                  height={512}
-                  loading="lazy"
-                  className="h-full w-full object-contain rounded-lg"
-                />
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold leading-tight truncate">{item.name}</p>
-                <StatBar value={item.condition} color={item.condition > 70 ? "success" : "warning"} className="mt-1" />
-              </div>
-            </button>
-          ))}
+              >
+                <div className="flex items-center justify-between">
+                  <RarityBadge rarity={item.rarity} />
+                  {item.washed && item.ironed && item.photographed && (
+                    <span className="text-success" title="Ready"><Sparkles className="h-3 w-3" /></span>
+                  )}
+                </div>
+                <div className="flex-1 grid place-items-center overflow-hidden my-1">
+                  {img ? (
+                    <img
+                      src={img}
+                      alt={item.name}
+                      width={512}
+                      height={512}
+                      loading="lazy"
+                      className="h-full w-full object-contain rounded-lg"
+                    />
+                  ) : (
+                    <span className="text-4xl">{item.emoji}</span>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold leading-tight truncate">{item.name}</p>
+                  <StatBar value={item.condition} color={item.condition > 70 ? "success" : "warning"} className="mt-1" />
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

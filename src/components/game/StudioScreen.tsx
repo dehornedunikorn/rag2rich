@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/game/store";
 import { InventoryItem, UPGRADES } from "@/game/types";
-import { ITEM_IMAGES } from "@/game/itemImages";
+import { getItemImage } from "@/game/itemImages";
+import { DESIGNER_BY_ID } from "@/game/designer";
 import { StatBar } from "./StatBar";
 import { RarityBadge } from "./RarityBadge";
 import { cn } from "@/lib/utils";
-import { Camera, Droplets, Flame, Tag, X, Check } from "lucide-react";
+import { Camera, Droplets, Flame, Tag, X, Check, Wand2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
+import { playRewardedAd } from "@/game/ads";
+import { AdModal } from "./AdModal";
 
 type Mode = "menu" | "wash" | "iron" | "photo";
 
@@ -17,14 +20,21 @@ const BACKDROPS = [
   { id: "neon",   label: "Neon",   emoji: "💜", quality: 95 },
 ];
 
+const itemImage = (item: InventoryItem): string | null => {
+  if (item.designerId) return DESIGNER_BY_ID[item.designerId]?.image ?? null;
+  return getItemImage(item.kind, item.variant);
+};
+
 export const StudioScreen = ({
   selected,
   onClose,
   onListItem,
+  onOpenGallery,
 }: {
   selected: InventoryItem | null;
   onClose: () => void;
   onListItem: (item: InventoryItem) => void;
+  onOpenGallery: () => void;
 }) => {
   const inventory = useGame((s) => s.inventory);
   const setItemCondition = useGame((s) => s.setItemCondition);
@@ -33,18 +43,59 @@ export const StudioScreen = ({
   const markIroned = useGame((s) => s.markIroned);
   const markPhotographed = useGame((s) => s.markPhotographed);
   const upgradeLevels = useGame((s) => s.upgradeLevels);
+  const repairAll = useGame((s) => s.repairAllInventory);
 
   const item = selected ? inventory.find((i) => i.id === selected.id) ?? null : null;
 
   const [mode, setMode] = useState<Mode>("menu");
+  const [magicAdOpen, setMagicAdOpen] = useState(false);
   useEffect(() => setMode("menu"), [selected?.id]);
 
   if (!item) {
     return (
-      <div className="px-4 py-4 animate-fade-in">
-        <h1 className="text-2xl font-display font-bold neon-text mb-1">Processing Studio</h1>
-        <p className="text-sm text-muted-foreground mb-6">Pick an item from your closet to start refurbishing.</p>
+      <div className="px-4 py-4 animate-fade-in space-y-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-bold neon-text">Processing Studio</h1>
+            <p className="text-sm text-muted-foreground">Pick an item from your closet to start refurbishing.</p>
+          </div>
+          <button
+            onClick={onOpenGallery}
+            className="px-3 py-1.5 rounded-full bg-gold/15 border border-gold/40 text-gold text-xs font-bold tap-scale flex items-center gap-1"
+          >
+            <ImageIcon className="h-3 w-3" /> Gallery
+          </button>
+        </div>
+
+        <button
+          onClick={async () => {
+            setMagicAdOpen(true);
+            await playRewardedAd("magic_laundry");
+          }}
+          className="w-full p-4 rounded-2xl bg-gradient-to-r from-accent/20 to-primary/20 border border-accent/40 tap-scale flex items-center gap-3"
+        >
+          <Wand2 className="h-6 w-6 text-accent" />
+          <div className="flex-1 text-left">
+            <p className="font-display font-bold">Magic Laundry</p>
+            <p className="text-xs text-muted-foreground">Watch an ad to repair every item to 100%.</p>
+          </div>
+          <span className="text-[10px] uppercase tracking-widest text-accent font-bold">Ad</span>
+        </button>
+
         <StudioPicks />
+
+        <AdModal
+          open={magicAdOpen}
+          title="Magic Laundry"
+          duration={5}
+          rewardLabel="All items repaired to 100%"
+          onComplete={() => {
+            setMagicAdOpen(false);
+            const n = repairAll();
+            toast.success("Magic Laundry done!", { description: `${n} items refreshed` });
+          }}
+          onSkip={() => setMagicAdOpen(false)}
+        />
       </div>
     );
   }
@@ -52,6 +103,7 @@ export const StudioScreen = ({
   const washerBonus = UPGRADES[0].levels[upgradeLevels.washer].bonus;
   const ironBonus = UPGRADES[1].levels[upgradeLevels.iron].bonus;
   const lightsCap = UPGRADES[2].levels[upgradeLevels.lights].bonus;
+  const img = itemImage(item);
 
   return (
     <div className="px-4 py-4 space-y-4 animate-fade-in">
@@ -62,17 +114,20 @@ export const StudioScreen = ({
         </button>
       </div>
 
-      <div className="rounded-2xl glass p-4">
+      <div className={cn(
+        "rounded-2xl glass p-4",
+        item.rarity === "designer" && "border-gold/50"
+      )}>
         <div className="flex items-center gap-3">
-          <div className="h-20 w-20 rounded-xl overflow-hidden border border-border bg-card">
-            <img
-              src={ITEM_IMAGES[item.kind]}
-              alt={item.name}
-              width={512}
-              height={512}
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
+          <div className={cn(
+            "h-20 w-20 rounded-xl overflow-hidden border bg-card",
+            item.rarity === "designer" ? "border-gold/60" : "border-border"
+          )}>
+            {img ? (
+              <img src={img} alt={item.name} width={512} height={512} loading="lazy" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full grid place-items-center text-3xl">{item.emoji}</div>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -214,21 +269,26 @@ const StudioPicks = () => {
   }
   return (
     <div className="grid grid-cols-3 gap-3">
-      {inventory.map((i) => (
-        <div key={i.id} className="aspect-square rounded-2xl overflow-hidden border border-border bg-card">
-          <img
-            src={ITEM_IMAGES[i.kind]}
-            alt={i.name}
-            width={512}
-            height={512}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        </div>
-      ))}
+      {inventory.map((i) => {
+        const img = itemImage(i);
+        return (
+          <div key={i.id} className={cn(
+            "aspect-square rounded-2xl overflow-hidden border bg-card",
+            i.rarity === "designer" ? "border-gold/60" : "border-border"
+          )}>
+            {img ? (
+              <img src={img} alt={i.name} width={512} height={512} loading="lazy" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full grid place-items-center text-3xl">{i.emoji}</div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
+
+// ---- Mini-games (HARDER & FASTER) ----
 
 const WashGame = ({
   item,
@@ -246,9 +306,11 @@ const WashGame = ({
   const dirRef = useRef(1);
   const rafRef = useRef<number>();
 
-  const halfZone = 0.1 + washerBonus;
+  // Tighter zone, much faster slider.
+  const halfZone = 0.05 + washerBonus; // was 0.1
   const zoneStart = 0.5 - halfZone;
   const zoneEnd = 0.5 + halfZone;
+  const SPEED = 2.2; // was 0.9
 
   useEffect(() => {
     let last = performance.now();
@@ -256,7 +318,7 @@ const WashGame = ({
       const dt = (t - last) / 1000;
       last = t;
       setPos((p) => {
-        let np = p + dirRef.current * dt * 0.9;
+        let np = p + dirRef.current * dt * SPEED;
         if (np >= 1) { np = 1; dirRef.current = -1; }
         if (np <= 0) { np = 0; dirRef.current = 1; }
         return np;
@@ -272,16 +334,16 @@ const WashGame = ({
     setStopped(pos);
     const inZone = pos >= zoneStart && pos <= zoneEnd;
     const distFromCenter = Math.abs(pos - 0.5);
-    const baseGain = inZone ? Math.max(15, 45 - distFromCenter * 160) : 4;
+    const baseGain = inZone ? Math.max(15, 45 - distFromCenter * 220) : 2;
     const newCond = Math.min(100, item.condition + baseGain);
-    setTimeout(() => onDone(newCond, inZone), 600);
+    setTimeout(() => onDone(newCond, inZone), 500);
   };
 
   return (
     <div className="rounded-2xl glass p-4 space-y-4 animate-scale-in">
       <div>
         <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Wash mini-game</p>
-        <p className="font-display font-bold">Stop in the green zone</p>
+        <p className="font-display font-bold">Stop in the green zone — fast!</p>
       </div>
       <div className="relative h-12 w-full rounded-full bg-secondary border border-border overflow-hidden">
         <div
@@ -323,16 +385,16 @@ const IronGame = ({
   onDone: (newCondition: number, success: boolean) => void;
   onCancel: () => void;
 }) => {
-  // Heat oscillates 0..1; perfect zone is around 0.7 ± window. Tap when heat is in zone.
   const [heat, setHeat] = useState(0);
   const [stopped, setStopped] = useState<number | null>(null);
   const dirRef = useRef(1);
   const rafRef = useRef<number>();
 
-  const halfZone = 0.08 + ironBonus / 200; // iron upgrade slightly widens
+  const halfZone = 0.045 + ironBonus / 300; // tighter (was 0.08)
   const zoneCenter = 0.72;
   const zoneStart = zoneCenter - halfZone;
   const zoneEnd = zoneCenter + halfZone;
+  const SPEED = 1.4; // was 0.55
 
   useEffect(() => {
     let last = performance.now();
@@ -340,7 +402,7 @@ const IronGame = ({
       const dt = (t - last) / 1000;
       last = t;
       setHeat((p) => {
-        let np = p + dirRef.current * dt * 0.55;
+        let np = p + dirRef.current * dt * SPEED;
         if (np >= 1) { np = 1; dirRef.current = -1; }
         if (np <= 0) { np = 0; dirRef.current = 1; }
         return np;
@@ -356,10 +418,10 @@ const IronGame = ({
     setStopped(heat);
     const inZone = heat >= zoneStart && heat <= zoneEnd;
     const distFromCenter = Math.abs(heat - zoneCenter);
-    const burned = heat > 0.92; // too hot
-    const baseGain = burned ? -8 : inZone ? Math.max(12, 35 - distFromCenter * 180) + ironBonus : 3;
+    const burned = heat > 0.9;
+    const baseGain = burned ? -12 : inZone ? Math.max(12, 35 - distFromCenter * 240) + ironBonus : 1;
     const newCond = Math.max(0, Math.min(100, item.condition + baseGain));
-    setTimeout(() => onDone(newCond, inZone && !burned), 600);
+    setTimeout(() => onDone(newCond, inZone && !burned), 500);
   };
 
   const heatColor = heat < 0.4 ? "hsl(200 80% 55%)" : heat < 0.6 ? "hsl(45 90% 55%)" : heat < 0.85 ? "hsl(20 90% 55%)" : "hsl(0 90% 55%)";
@@ -368,28 +430,23 @@ const IronGame = ({
     <div className="rounded-2xl glass p-4 space-y-4 animate-scale-in">
       <div>
         <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Iron mini-game</p>
-        <p className="font-display font-bold">Press when heat is just right</p>
+        <p className="font-display font-bold">Press when heat is just right — careful, it's racing!</p>
       </div>
 
-      {/* Vertical heat gauge */}
       <div className="flex items-end gap-3">
         <div className="relative h-40 w-10 rounded-full bg-secondary border border-border overflow-hidden">
-          {/* perfect zone */}
           <div
             className="absolute left-0 right-0 bg-success/25 border-y border-success"
             style={{ bottom: `${zoneStart * 100}%`, height: `${(zoneEnd - zoneStart) * 100}%` }}
           />
-          {/* danger zone */}
           <div
             className="absolute left-0 right-0 bg-destructive/20 border-t border-destructive"
-            style={{ bottom: `92%`, height: `8%` }}
+            style={{ bottom: `90%`, height: `10%` }}
           />
-          {/* heat fill */}
           <div
             className="absolute left-0 right-0 bottom-0 transition-none"
             style={{ height: `${heat * 100}%`, background: `linear-gradient(to top, hsl(200 80% 50%), ${heatColor})` }}
           />
-          {/* indicator */}
           <div
             className="absolute left-0 right-0 h-1 bg-foreground/90 shadow-neon"
             style={{ bottom: `calc(${heat * 100}% - 2px)` }}
@@ -437,6 +494,7 @@ const PhotoMode = ({
   const [light, setLight] = useState(50);
   const chosen = BACKDROPS.find((b) => b.id === backdrop)!;
   const quality = Math.min(lightsCap, chosen.quality * 0.6 + light * 0.4);
+  const img = itemImage(item);
 
   return (
     <div className="rounded-2xl glass p-4 space-y-4 animate-scale-in">
@@ -453,15 +511,19 @@ const PhotoMode = ({
                : "linear-gradient(135deg, hsl(280 90% 35%), hsl(195 90% 40%))"
            }}>
         <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 30%, hsl(0 0% 100% / ${light/180}), transparent 60%)` }} />
-        <img
-          src={ITEM_IMAGES[item.kind]}
-          alt={item.name}
-          width={512}
-          height={512}
-          loading="lazy"
-          className="relative h-3/4 w-3/4 object-contain drop-shadow-2xl mix-blend-multiply"
-          style={{ mixBlendMode: backdrop === "white" ? "multiply" : "normal" }}
-        />
+        {img ? (
+          <img
+            src={img}
+            alt={item.name}
+            width={512}
+            height={512}
+            loading="lazy"
+            className="relative h-3/4 w-3/4 object-contain drop-shadow-2xl"
+            style={{ mixBlendMode: backdrop === "white" ? "multiply" : "normal" }}
+          />
+        ) : (
+          <span className="relative text-7xl">{item.emoji}</span>
+        )}
       </div>
 
       <div>
@@ -486,7 +548,7 @@ const PhotoMode = ({
       <div>
         <div className="flex justify-between text-xs mb-1">
           <span>Lighting</span>
-          <span className="tabular-nums font-semibold">{light}%</span>
+          <span className="tabular-nums font-semibold">{light}</span>
         </div>
         <input
           type="range" min={0} max={100} value={light}
@@ -495,7 +557,10 @@ const PhotoMode = ({
         />
       </div>
 
-      <StatBar value={quality} color="accent" label="Predicted photo quality" />
+      <div className="rounded-xl bg-secondary p-3 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">Estimated photo quality</span>
+        <span className="text-lg font-display font-bold tabular-nums">{Math.round(quality)}%</span>
+      </div>
 
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-secondary border border-border font-semibold tap-scale">
@@ -503,9 +568,9 @@ const PhotoMode = ({
         </button>
         <button
           onClick={() => onDone(quality)}
-          className="flex-[2] py-3 rounded-xl bg-gradient-primary text-primary-foreground font-bold tap-scale shadow-neon"
+          className="flex-[2] py-3 rounded-xl bg-gradient-primary text-primary-foreground font-bold tap-scale shadow-neon flex items-center justify-center gap-2"
         >
-          📸 Capture
+          <Camera className="h-4 w-4" /> SHOOT
         </button>
       </div>
     </div>

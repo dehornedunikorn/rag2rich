@@ -1,15 +1,13 @@
-import redThriller from "@/assets/designer/red_thriller.jpg";
-import timeTraveler from "@/assets/designer/time_traveler_shoes.jpg";
-import saturdayFever from "@/assets/designer/saturday_fever_suit.jpg";
-import wildOne from "@/assets/designer/wild_one_jacket.jpg";
-import dragon from "@/assets/designer/dragon_tracksuit.jpg";
-import dudeRobe from "@/assets/designer/dude_robe.jpg";
-import nightmare from "@/assets/designer/nightmare_sweater.jpg";
-import tiffany from "@/assets/designer/tiffany_dress.jpg";
-import king from "@/assets/designer/king_jumpsuit.jpg";
-import theOne from "@/assets/designer/the_one_coat.jpg";
-import redCap from "@/assets/designer/red_cap.jpg";
-import escape from "@/assets/designer/escape_jumpsuit.jpg";
+// Eagerly import every designer image — keys are file basenames matching item ids.
+const designerImages = import.meta.glob<{ default: string }>(
+  "../assets/designer/*.jpg",
+  { eager: true }
+);
+const imgById: Record<string, string> = {};
+for (const path in designerImages) {
+  const id = path.split("/").pop()!.replace(".jpg", "");
+  imgById[id] = designerImages[path].default;
+}
 
 export interface DesignerItem {
   id: string;
@@ -17,24 +15,29 @@ export interface DesignerItem {
   description: string; // cryptic pop-culture reference
   baseValue: number;
   weight: number;
-  image?: string; // hero items only — others use gold-frame placeholder
+  image?: string; // resolved from /assets/designer/{id}.jpg if present
   emoji: string;  // fallback / silhouette accent
 }
 
+const withImage = (item: Omit<DesignerItem, "image">): DesignerItem => ({
+  ...item,
+  image: imgById[item.id],
+});
+
 // 50 designer items — first 12 are hero art, rest fall back to themed gold cards.
 export const DESIGNER_ITEMS: DesignerItem[] = [
-  { id: "red_thriller",        name: "Red Thriller Jacket",   description: "Cause this is… a moonwalk away from being yours.", baseValue: 2400, weight: 1.4, image: redThriller, emoji: "🕺" },
-  { id: "time_traveler_shoes", name: "Time Traveler Shoes",   description: "Power-laces. About time, huh? Hits 88 mph not included.", baseValue: 3200, weight: 1.0, image: timeTraveler, emoji: "👟" },
-  { id: "saturday_fever_suit", name: "Saturday Night Suit",   description: "Stayin' alive on the dance floor since '77.", baseValue: 2800, weight: 1.5, image: saturdayFever, emoji: "🪩" },
-  { id: "wild_one_jacket",     name: "Wild One Studded",      description: "What are you rebelling against? Whaddya got?", baseValue: 2600, weight: 1.6, image: wildOne, emoji: "🏍️" },
-  { id: "dragon_tracksuit",    name: "Dragon Tracksuit",      description: "Yellow with two black stripes. The student is now the master.", baseValue: 2900, weight: 0.9, image: dragon, emoji: "🐉" },
-  { id: "dude_robe",           name: "The Abiding Robe",      description: "It really tied the room together, man.", baseValue: 1800, weight: 0.9, image: dudeRobe, emoji: "🎳" },
-  { id: "nightmare_sweater",   name: "Nightmare Sweater",     description: "One, two, Freddy's coming for… your closet.", baseValue: 2200, weight: 1.0, image: nightmare, emoji: "🔪" },
-  { id: "tiffany_dress",       name: "Breakfast Dress",       description: "A little black number. Goes with pearls and pastries.", baseValue: 3500, weight: 0.5, image: tiffany, emoji: "💎" },
-  { id: "king_jumpsuit",       name: "Vegas King Jacket",     description: "Thank you. Thank you very much.", baseValue: 3000, weight: 1.3, image: king, emoji: "👑" },
-  { id: "the_one_coat",        name: "The One Coat",          description: "There is no closet. Only the coat.", baseValue: 3400, weight: 1.8, image: theOne, emoji: "🕶️" },
-  { id: "red_cap",             name: "The Red Cap",           description: "Worn by a catcher in a certain field of rye.", baseValue: 1500, weight: 0.2, image: redCap, emoji: "🧢" },
-  { id: "escape_jumpsuit",     name: "Escape Jumpsuit",       description: "Crawled through 500 yards of foulness. Came out clean.", baseValue: 2000, weight: 1.1, image: escape, emoji: "🪣" },
+  { id: "red_thriller",        name: "Red Thriller Jacket",   description: "Cause this is… a moonwalk away from being yours.", baseValue: 2400, weight: 1.4, emoji: "🕺" },
+  { id: "time_traveler_shoes", name: "Time Traveler Shoes",   description: "Power-laces. About time, huh? Hits 88 mph not included.", baseValue: 3200, weight: 1.0, emoji: "👟" },
+  { id: "saturday_fever_suit", name: "Saturday Night Suit",   description: "Stayin' alive on the dance floor since '77.", baseValue: 2800, weight: 1.5, emoji: "🪩" },
+  { id: "wild_one_jacket",     name: "Wild One Studded",      description: "What are you rebelling against? Whaddya got?", baseValue: 2600, weight: 1.6, emoji: "🏍️" },
+  { id: "dragon_tracksuit",    name: "Dragon Tracksuit",      description: "Yellow with two black stripes. The student is now the master.", baseValue: 2900, weight: 0.9, emoji: "🐉" },
+  { id: "dude_robe",           name: "The Abiding Robe",      description: "It really tied the room together, man.", baseValue: 1800, weight: 0.9, emoji: "🎳" },
+  { id: "nightmare_sweater",   name: "Nightmare Sweater",     description: "One, two, Freddy's coming for… your closet.", baseValue: 2200, weight: 1.0, emoji: "🔪" },
+  { id: "tiffany_dress",       name: "Breakfast Dress",       description: "A little black number. Goes with pearls and pastries.", baseValue: 3500, weight: 0.5, emoji: "💎" },
+  { id: "king_jumpsuit",       name: "Vegas King Jacket",     description: "Thank you. Thank you very much.", baseValue: 3000, weight: 1.3, emoji: "👑" },
+  { id: "the_one_coat",        name: "The One Coat",          description: "There is no closet. Only the coat.", baseValue: 3400, weight: 1.8, emoji: "🕶️" },
+  { id: "red_cap",             name: "The Red Cap",           description: "Worn by a catcher in a certain field of rye.", baseValue: 1500, weight: 0.2, emoji: "🧢" },
+  { id: "escape_jumpsuit",     name: "Escape Jumpsuit",       description: "Crawled through 500 yards of foulness. Came out clean.", baseValue: 2000, weight: 1.1, emoji: "🪣" },
 
   // Remaining 38 — gold-frame placeholders, still cryptic.
   { id: "wand_robe",         name: "Boy Who Lived Robe",      description: "Nine and three-quarters tailored. Owl optional.",            baseValue: 2700, weight: 1.2, emoji: "⚡" },
@@ -75,7 +78,7 @@ export const DESIGNER_ITEMS: DesignerItem[] = [
   { id: "drive_jacket",      name: "Scorpion Jacket",         description: "Real human bean. Real polyester satin.",                     baseValue: 2500, weight: 1.1, emoji: "🦂" },
   { id: "ferris_vest",       name: "Day Off Vest",            description: "Life moves pretty fast. So do these listings.",              baseValue: 1600, weight: 0.5, emoji: "🎡" },
   { id: "mclovin_id_tee",    name: "McLovin Tee",             description: "One name. No surname. Big mood.",                            baseValue: 1200, weight: 0.3, emoji: "🪪" },
-];
+].map(withImage);
 
 export const DESIGNER_BY_ID: Record<string, DesignerItem> =
   Object.fromEntries(DESIGNER_ITEMS.map((d) => [d.id, d]));

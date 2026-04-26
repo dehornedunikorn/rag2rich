@@ -56,7 +56,7 @@ interface GameState {
   unlockWebshop: () => boolean;
   awardDesigner: (designerId?: string) => InventoryItem | null;
   repairAllInventory: () => number;
-  sellTopListings: (count: number) => { sold: number; earned: number };
+  sellRandomListings: (count: number) => { sold: number; earned: number };
   hydrate: (partial: Partial<GameState>) => void;
 }
 
@@ -324,12 +324,16 @@ export const useGame = create<GameState>()(
         return count;
       },
 
-      sellTopListings: (count) => {
+      sellRandomListings: (count) => {
         const s = get();
         if (s.listings.length === 0) return { sold: 0, earned: 0 };
-        // Sell up to `count` of the most expensive listings
-        const sorted = [...s.listings].sort((a, b) => b.price - a.price);
-        const toSell = sorted.slice(0, count);
+        // Pick `count` random listings (Fisher-Yates partial shuffle).
+        const pool = [...s.listings];
+        for (let i = pool.length - 1; i > 0 && i > pool.length - 1 - count; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        const toSell = pool.slice(Math.max(0, pool.length - count));
         const ids = new Set(toSell.map((l) => l.id));
         const earned = toSell.reduce((sum, l) => sum + l.price, 0);
         set({

@@ -83,7 +83,7 @@ export const FloatingAdIcons = () => {
             className={cn(
               "pointer-events-auto absolute right-3 bottom-28",
               "h-14 w-14 rounded-full grid place-items-center",
-              "bg-gradient-to-br from-gold to-amber-500 text-gold-foreground",
+              "bg-gradient-to-br from-gold to-warning text-gold-foreground",
               "border-2 border-gold shadow-[0_0_20px_hsl(var(--gold)/0.6)]",
               "animate-bounce tap-scale"
             )}

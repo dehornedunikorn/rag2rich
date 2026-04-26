@@ -9,6 +9,7 @@ import { ShopScreen } from "@/components/game/ShopScreen";
 import { StudioGallery } from "@/components/game/StudioGallery";
 import { AdBanner } from "@/components/game/AdBanner";
 import { AdModal } from "@/components/game/AdModal";
+import { FloatingAdIcons } from "@/components/game/FloatingAdIcons";
 import { InventoryItem } from "@/game/types";
 import { useFirebaseUser, useFirestoreSync } from "@/game/firestoreSync";
 import { playInterstitialAd } from "@/game/ads";
@@ -63,6 +64,8 @@ const Index = () => {
       </main>
       <AdBanner />
       <BottomNav active={screen} onChange={(s) => { setSelected(null); setGalleryOpen(false); setScreen(s); }} />
+
+      <FloatingAdIcons />
 
       <AdModal
         open={interstitialOpen}

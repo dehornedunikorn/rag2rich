@@ -98,6 +98,8 @@ export const useGame = create<GameState>()(
         const def = BALES.find((b) => b.id === id);
         const s = get();
         if (!def || s.coins < def.cost || s.activeBale) return false;
+        // Block if total occupied (inventory + listings) is already at cap.
+        if (s.inventory.length + s.listings.length >= capacity(s.storageTier)) return false;
         set({
           coins: s.coins - def.cost,
           activeBale: { def, remainingWeight: def.weight, currentItem: null },
@@ -110,7 +112,8 @@ export const useGame = create<GameState>()(
         if (!s.activeBale) return null;
         const ab = s.activeBale;
 
-        if (s.inventory.length >= capacity(s.storageTier)) return null;
+        // Hard cap: occupied = inventory + listings must be < capacity.
+        if (s.inventory.length + s.listings.length >= capacity(s.storageTier)) return null;
 
         let cur = ab.currentItem;
         if (!cur) {

@@ -78,7 +78,7 @@ export const DESIGNER_ITEMS: DesignerItem[] = [
   { id: "drive_jacket",      name: "Scorpion Jacket",         description: "Real human bean. Real polyester satin.",                     baseValue: 2500, weight: 1.1, emoji: "🦂" },
   { id: "ferris_vest",       name: "Day Off Vest",            description: "Life moves pretty fast. So do these listings.",              baseValue: 1600, weight: 0.5, emoji: "🎡" },
   { id: "mclovin_id_tee",    name: "McLovin Tee",             description: "One name. No surname. Big mood.",                            baseValue: 1200, weight: 0.3, emoji: "🪪" },
-];
+].map(withImage);
 
 export const DESIGNER_BY_ID: Record<string, DesignerItem> =
   Object.fromEntries(DESIGNER_ITEMS.map((d) => [d.id, d]));

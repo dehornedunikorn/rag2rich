@@ -1,15 +1,13 @@
-import redThriller from "@/assets/designer/red_thriller.jpg";
-import timeTraveler from "@/assets/designer/time_traveler_shoes.jpg";
-import saturdayFever from "@/assets/designer/saturday_fever_suit.jpg";
-import wildOne from "@/assets/designer/wild_one_jacket.jpg";
-import dragon from "@/assets/designer/dragon_tracksuit.jpg";
-import dudeRobe from "@/assets/designer/dude_robe.jpg";
-import nightmare from "@/assets/designer/nightmare_sweater.jpg";
-import tiffany from "@/assets/designer/tiffany_dress.jpg";
-import king from "@/assets/designer/king_jumpsuit.jpg";
-import theOne from "@/assets/designer/the_one_coat.jpg";
-import redCap from "@/assets/designer/red_cap.jpg";
-import escape from "@/assets/designer/escape_jumpsuit.jpg";
+// Eagerly import every designer image — keys are file basenames matching item ids.
+const designerImages = import.meta.glob<{ default: string }>(
+  "../assets/designer/*.jpg",
+  { eager: true }
+);
+const imgById: Record<string, string> = {};
+for (const path in designerImages) {
+  const id = path.split("/").pop()!.replace(".jpg", "");
+  imgById[id] = designerImages[path].default;
+}
 
 export interface DesignerItem {
   id: string;
@@ -17,9 +15,14 @@ export interface DesignerItem {
   description: string; // cryptic pop-culture reference
   baseValue: number;
   weight: number;
-  image?: string; // hero items only — others use gold-frame placeholder
+  image?: string; // resolved from /assets/designer/{id}.jpg if present
   emoji: string;  // fallback / silhouette accent
 }
+
+const withImage = (item: Omit<DesignerItem, "image">): DesignerItem => ({
+  ...item,
+  image: imgById[item.id],
+});
 
 // 50 designer items — first 12 are hero art, rest fall back to themed gold cards.
 export const DESIGNER_ITEMS: DesignerItem[] = [

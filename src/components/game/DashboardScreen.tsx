@@ -60,24 +60,39 @@ export const DashboardScreen = ({ onOpenInventory }: { onOpenInventory: () => vo
     <div className="px-4 py-4 space-y-4 animate-fade-in">
       {!activeBale && (
         <>
-          <div>
-            <h1 className="text-2xl font-display font-bold neon-text">Buy a Bale</h1>
-            <p className="text-sm text-muted-foreground">Pick a mystery bundle and start unboxing.</p>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-display font-bold neon-text">Buy a Bale</h1>
+              <p className="text-sm text-muted-foreground">Pick a mystery bundle and start unboxing.</p>
+            </div>
+            <div className={cn(
+              "px-3 py-1.5 rounded-full text-xs font-bold tabular-nums border shrink-0",
+              isFull ? "bg-destructive/15 border-destructive/40 text-destructive" : "bg-secondary border-border text-muted-foreground"
+            )}>
+              {occupied}/{cap} slots
+            </div>
           </div>
+          {isFull && (
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Storage full — sell items or upgrade before unpacking another bale.
+            </div>
+          )}
           <div className="space-y-3">
             {BALES.map((b) => {
               const afford = coins >= b.cost;
+              const disabled = !afford || isFull;
               return (
                 <button
                   key={b.id}
                   onClick={() => {
+                    if (isFull) { toast.error("Storage full"); return; }
                     if (!buyBale(b.id)) toast.error(afford ? "Already opening a bale" : "Not enough coins");
                   }}
-                  disabled={!afford}
+                  disabled={disabled}
                   className={cn(
                     "w-full text-left p-4 rounded-2xl bg-gradient-surface border border-border tap-scale shadow-card",
                     "flex items-center gap-3 transition-all",
-                    afford ? "hover:border-primary/60 hover:shadow-neon" : "opacity-50"
+                    !disabled ? "hover:border-primary/60 hover:shadow-neon" : "opacity-50"
                   )}
                 >
                   <div className="h-16 w-16 rounded-xl bg-gradient-bale grid place-items-center text-3xl shrink-0 border border-border">

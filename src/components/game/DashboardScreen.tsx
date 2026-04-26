@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import baleImg from "@/assets/bale.png";
-import { useGame, selectCapacity } from "@/game/store";
+import { useGame, selectCapacity, selectOccupied } from "@/game/store";
 import { BALES } from "@/game/types";
 import { Coins, X } from "lucide-react";
 import { StatBar } from "@/components/game/StatBar";
@@ -12,7 +12,9 @@ export const DashboardScreen = ({ onOpenInventory }: { onOpenInventory: () => vo
   const coins = useGame((s) => s.coins);
   const activeBale = useGame((s) => s.activeBale);
   const inventoryCount = useGame((s) => s.inventory.length);
+  const occupied = useGame(selectOccupied);
   const cap = useGame(selectCapacity);
+  const isFull = occupied >= cap;
   const buyBale = useGame((s) => s.buyBale);
   const clickBale = useGame((s) => s.clickBale);
   const closeBale = useGame((s) => s.closeBale);
@@ -23,8 +25,8 @@ export const DashboardScreen = ({ onOpenInventory }: { onOpenInventory: () => vo
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!activeBale) return;
-    if (inventoryCount >= cap) {
-      toast.error("Storage full! Sell or upgrade.");
+    if (isFull) {
+      toast.error("Storage full! Sell or upgrade to unpack more.");
       return;
     }
     const rect = e.currentTarget.getBoundingClientRect();

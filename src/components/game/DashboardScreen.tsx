@@ -183,10 +183,16 @@ export const DashboardScreen = ({ onOpenInventory }: { onOpenInventory: () => vo
             </button>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl glass p-3">
+          <div className={cn(
+            "flex items-center justify-between rounded-xl glass p-3",
+            isFull && "border border-destructive/40"
+          )}>
             <div>
               <p className="text-[11px] uppercase tracking-widest text-muted-foreground">Storage</p>
-              <p className="font-display font-bold tabular-nums">{inventoryCount} / {cap}</p>
+              <p className={cn("font-display font-bold tabular-nums", isFull && "text-destructive")}>
+                {occupied} / {cap}
+              </p>
+              {isFull && <p className="text-[10px] text-destructive">Full — can't unpack more.</p>}
             </div>
             <button onClick={onOpenInventory} className="px-4 py-2 rounded-lg bg-secondary border border-border text-sm font-semibold tap-scale">
               View Closet

@@ -286,7 +286,7 @@ export const useGame = create<GameState>()(
 
       awardDesigner: (designerId) => {
         const s = get();
-        if (s.inventory.length >= capacity(s.storageTier)) return null;
+        if (s.inventory.length + s.listings.length >= capacity(s.storageTier)) return null;
         const def = designerId
           ? DESIGNER_BY_ID[designerId]
           : DESIGNER_ITEMS[Math.floor(Math.random() * DESIGNER_ITEMS.length)];

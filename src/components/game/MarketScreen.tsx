@@ -64,33 +64,15 @@ export const MarketScreen = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 rounded-xl bg-secondary border border-border px-3 py-2 text-xs flex items-center justify-between">
-          <span className="text-muted-foreground">Listing fee</span>
-          <span className="font-bold tabular-nums">
-            {webshopUnlocked
-              ? "Free (Webshop)"
-              : freeUploads > 0
-                ? `Free × ${freeUploads}`
-                : `${MARKET_LISTING_FEE}c`}
-          </span>
-        </div>
-        <button
-          disabled={registerCooldown > 0 || listings.length === 0}
-          onClick={() => setRegisterAdOpen(true)}
-          className={cn(
-            "px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 tap-scale border",
-            registerCooldown > 0 || listings.length === 0
-              ? "bg-secondary border-border text-muted-foreground"
-              : "bg-gold/15 border-gold/40 text-gold"
-          )}
-          title="Watch ad to instantly sell up to 5 listings"
-        >
-          <Sparkles className="h-3 w-3" />
-          {registerCooldown > 0
-            ? `${Math.ceil(registerCooldown / 1000)}s`
-            : "Register"}
-        </button>
+      <div className="rounded-xl bg-secondary border border-border px-3 py-2 text-xs flex items-center justify-between">
+        <span className="text-muted-foreground">Listing fee</span>
+        <span className="font-bold tabular-nums">
+          {webshopUnlocked
+            ? "Free (Webshop)"
+            : freeUploads > 0
+              ? `Free × ${freeUploads}`
+              : `${MARKET_LISTING_FEE}c`}
+        </span>
       </div>
 
       {pendingList && (

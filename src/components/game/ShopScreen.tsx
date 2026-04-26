@@ -173,20 +173,6 @@ export const ShopScreen = () => {
         Reset progress
       </button>
 
-      <AdModal
-        open={designerAdOpen}
-        title="Designer Drop"
-        duration={5}
-        rewardLabel="1 random Designer item"
-        onComplete={async () => {
-          await playRewardedAd("designer_drop");
-          setDesignerAdOpen(false);
-          const got = awardDesigner();
-          if (got) toast.success(`Designer Drop! ${got.name}`, { description: "Check your closet" });
-          else toast.error("No room — upgrade storage first");
-        }}
-        onSkip={() => setDesignerAdOpen(false)}
-      />
     </div>
   );
 };

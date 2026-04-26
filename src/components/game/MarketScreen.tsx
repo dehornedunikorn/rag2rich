@@ -5,11 +5,9 @@ import { getItemImage } from "@/game/itemImages";
 import { DESIGNER_BY_ID } from "@/game/designer";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
-import { Coins, Tag, Undo2, X, Gift, Sparkles } from "lucide-react";
+import { Coins, Tag, Undo2, X, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { playRewardedAd } from "@/game/ads";
-import { AdModal } from "./AdModal";
 
 const itemImage = (item: InventoryItem): string | null => {
   if (item.designerId) return DESIGNER_BY_ID[item.designerId]?.image ?? null;
@@ -33,12 +31,8 @@ export const MarketScreen = ({
   const freeUploads = useGame((s) => s.freeUploads);
   const grantFree = useGame((s) => s.grantFreeUploads);
   const webshopUnlocked = useGame((s) => s.webshopUnlocked);
-  const sellTop = useGame((s) => s.sellTopListings);
 
   const [giftOpen, setGiftOpen] = useState(false);
-  const [registerAdOpen, setRegisterAdOpen] = useState(false);
-  const [registerAvailableAt, setRegisterAvailableAt] = useState(Date.now());
-  const [now, setNow] = useState(Date.now());
 
   // Market tick
   useEffect(() => {
@@ -53,13 +47,6 @@ export const MarketScreen = ({
     }, 10000);
     return () => clearInterval(t);
   }, []);
-
-  // Golden Register cooldown ticker
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const registerCooldown = Math.max(0, registerAvailableAt - now);
 
   return (
     <div className="px-4 py-4 space-y-4 animate-fade-in">

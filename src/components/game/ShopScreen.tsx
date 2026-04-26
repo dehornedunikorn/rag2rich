@@ -1,11 +1,8 @@
-import { useState } from "react";
 import { useGame, selectReputationPct } from "@/game/store";
 import { STORAGE_TIERS, StorageTier, UPGRADES, WEBSHOP_COST, WEBSHOP_REQUIRED_REP_PCT } from "@/game/types";
-import { Coins, Lock, Store, Sparkles } from "lucide-react";
+import { Coins, Lock, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { playRewardedAd } from "@/game/ads";
-import { AdModal } from "./AdModal";
 
 const TIER_ORDER: StorageTier[] = ["closet", "room", "garage", "container"];
 
@@ -19,9 +16,6 @@ export const ShopScreen = () => {
   const repPct = useGame(selectReputationPct);
   const webshopUnlocked = useGame((s) => s.webshopUnlocked);
   const unlockWebshop = useGame((s) => s.unlockWebshop);
-  const awardDesigner = useGame((s) => s.awardDesigner);
-
-  const [designerAdOpen, setDesignerAdOpen] = useState(false);
 
   return (
     <div className="px-4 py-4 space-y-6 animate-fade-in">
@@ -29,21 +23,6 @@ export const ShopScreen = () => {
         <h1 className="text-2xl font-display font-bold neon-text">Shop</h1>
         <p className="text-sm text-muted-foreground">Reinvest in your empire.</p>
       </div>
-
-      {/* Designer Drop ad button */}
-      <button
-        onClick={() => setDesignerAdOpen(true)}
-        className="w-full p-4 rounded-2xl bg-gradient-to-r from-gold/15 to-primary/15 border border-gold/40 tap-scale flex items-center gap-3"
-      >
-        <div className="h-12 w-12 rounded-xl bg-gold grid place-items-center text-gold-foreground">
-          <Sparkles className="h-6 w-6" />
-        </div>
-        <div className="flex-1 text-left">
-          <p className="font-display font-bold">Designer Drop</p>
-          <p className="text-xs text-muted-foreground">Watch a 30s ad for 1 random Designer item.</p>
-        </div>
-        <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Ad</span>
-      </button>
 
       {/* Webshop unlock */}
       <section className="space-y-2">
@@ -194,20 +173,6 @@ export const ShopScreen = () => {
         Reset progress
       </button>
 
-      <AdModal
-        open={designerAdOpen}
-        title="Designer Drop"
-        duration={5}
-        rewardLabel="1 random Designer item"
-        onComplete={async () => {
-          await playRewardedAd("designer_drop");
-          setDesignerAdOpen(false);
-          const got = awardDesigner();
-          if (got) toast.success(`Designer Drop! ${got.name}`, { description: "Check your closet" });
-          else toast.error("No room — upgrade storage first");
-        }}
-        onSkip={() => setDesignerAdOpen(false)}
-      />
     </div>
   );
 };

@@ -5,11 +5,9 @@ import { getItemImage } from "@/game/itemImages";
 import { DESIGNER_BY_ID } from "@/game/designer";
 import { RarityBadge } from "./RarityBadge";
 import { StatBar } from "./StatBar";
-import { Coins, Tag, Undo2, X, Gift, Sparkles } from "lucide-react";
+import { Coins, Tag, Undo2, X, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { playRewardedAd } from "@/game/ads";
-import { AdModal } from "./AdModal";
 
 const itemImage = (item: InventoryItem): string | null => {
   if (item.designerId) return DESIGNER_BY_ID[item.designerId]?.image ?? null;
@@ -33,12 +31,8 @@ export const MarketScreen = ({
   const freeUploads = useGame((s) => s.freeUploads);
   const grantFree = useGame((s) => s.grantFreeUploads);
   const webshopUnlocked = useGame((s) => s.webshopUnlocked);
-  const sellTop = useGame((s) => s.sellTopListings);
 
   const [giftOpen, setGiftOpen] = useState(false);
-  const [registerAdOpen, setRegisterAdOpen] = useState(false);
-  const [registerAvailableAt, setRegisterAvailableAt] = useState(Date.now());
-  const [now, setNow] = useState(Date.now());
 
   // Market tick
   useEffect(() => {
@@ -53,13 +47,6 @@ export const MarketScreen = ({
     }, 10000);
     return () => clearInterval(t);
   }, []);
-
-  // Golden Register cooldown ticker
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const registerCooldown = Math.max(0, registerAvailableAt - now);
 
   return (
     <div className="px-4 py-4 space-y-4 animate-fade-in">
@@ -77,33 +64,15 @@ export const MarketScreen = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 rounded-xl bg-secondary border border-border px-3 py-2 text-xs flex items-center justify-between">
-          <span className="text-muted-foreground">Listing fee</span>
-          <span className="font-bold tabular-nums">
-            {webshopUnlocked
-              ? "Free (Webshop)"
-              : freeUploads > 0
-                ? `Free × ${freeUploads}`
-                : `${MARKET_LISTING_FEE}c`}
-          </span>
-        </div>
-        <button
-          disabled={registerCooldown > 0 || listings.length === 0}
-          onClick={() => setRegisterAdOpen(true)}
-          className={cn(
-            "px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1 tap-scale border",
-            registerCooldown > 0 || listings.length === 0
-              ? "bg-secondary border-border text-muted-foreground"
-              : "bg-gold/15 border-gold/40 text-gold"
-          )}
-          title="Watch ad to instantly sell up to 5 listings"
-        >
-          <Sparkles className="h-3 w-3" />
-          {registerCooldown > 0
-            ? `${Math.ceil(registerCooldown / 1000)}s`
-            : "Register"}
-        </button>
+      <div className="rounded-xl bg-secondary border border-border px-3 py-2 text-xs flex items-center justify-between">
+        <span className="text-muted-foreground">Listing fee</span>
+        <span className="font-bold tabular-nums">
+          {webshopUnlocked
+            ? "Free (Webshop)"
+            : freeUploads > 0
+              ? `Free × ${freeUploads}`
+              : `${MARKET_LISTING_FEE}c`}
+        </span>
       </div>
 
       {pendingList && (
@@ -194,21 +163,6 @@ export const MarketScreen = ({
         </div>
       )}
 
-      <AdModal
-        open={registerAdOpen}
-        title="Golden Register"
-        duration={5}
-        rewardLabel="Instantly sell up to 5 listings"
-        onComplete={async () => {
-          await playRewardedAd("golden_register");
-          const { sold, earned } = sellTop(5);
-          setRegisterAdOpen(false);
-          setRegisterAvailableAt(Date.now() + 5 * 60 * 1000); // 5-min cooldown
-          if (sold > 0) toast.success(`Register cha-ching!`, { description: `${sold} sold · +${earned}c` });
-          else toast("Nothing to sell");
-        }}
-        onSkip={() => setRegisterAdOpen(false)}
-      />
     </div>
   );
 };

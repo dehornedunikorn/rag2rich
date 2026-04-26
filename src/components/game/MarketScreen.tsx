@@ -163,21 +163,6 @@ export const MarketScreen = ({
         </div>
       )}
 
-      <AdModal
-        open={registerAdOpen}
-        title="Golden Register"
-        duration={5}
-        rewardLabel="Instantly sell up to 5 listings"
-        onComplete={async () => {
-          await playRewardedAd("golden_register");
-          const { sold, earned } = sellTop(5);
-          setRegisterAdOpen(false);
-          setRegisterAvailableAt(Date.now() + 5 * 60 * 1000); // 5-min cooldown
-          if (sold > 0) toast.success(`Register cha-ching!`, { description: `${sold} sold · +${earned}c` });
-          else toast("Nothing to sell");
-        }}
-        onSkip={() => setRegisterAdOpen(false)}
-      />
     </div>
   );
 };

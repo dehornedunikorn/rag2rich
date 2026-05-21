@@ -18,7 +18,7 @@ import {
   type AdMobRewardItem,
   type BannerAdOptions,
   type RewardAdOptions,
-  type InterstitialAdOptions,
+  type AdOptions,
 } from "@capacitor-community/admob";
 
 export const ADMOB_IDS = {

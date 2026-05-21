@@ -8,8 +8,7 @@ import { RarityBadge } from "./RarityBadge";
 import { cn } from "@/lib/utils";
 import { Camera, Droplets, Flame, Tag, X, Check, Wand2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { playRewardedAd } from "@/game/ads";
-import { AdModal } from "./AdModal";
+import { showRewarded } from "@/game/admob";
 
 type Mode = "menu" | "wash" | "iron" | "photo";
 

@@ -1,35 +1,22 @@
 /**
- * Ad system stubs.
- *
- * In production these would call AdSense / AdMob / Unity Ads / etc.
- * For now they just resolve immediately so the game loop is testable.
- *
- * To wire a real provider:
- *   1. Replace the body of `playRewardedAd` to await the SDK callback.
- *   2. Replace `playInterstitialAd` similarly.
- *   3. Replace the AdBanner component (src/components/game/AdBanner.tsx)
- *      with the real banner script tag.
+ * Compatibility shim — re-exports the AdMob wrapper using the old API names
+ * so existing call sites keep working.
  */
+import { showInterstitial, showRewarded, type RewardSlot } from "./admob";
 
-export type AdSlot =
-  | "designer_drop"      // 30s rewarded — 1 random Designer item
-  | "magic_laundry"      // rewarded — repair all inventory to 100%
-  | "golden_register"    // rewarded — instantly sell up to 5 listings
-  | "interstitial";      // 10-min full-screen
+export type AdSlot = RewardSlot | "interstitial";
 
 export interface AdResult {
   slot: AdSlot;
-  watched: boolean; // false = user skipped / no fill
+  watched: boolean;
 }
 
-export async function playRewardedAd(slot: AdSlot): Promise<AdResult> {
-  // TODO: integrate AdSense / AdMob SDK here.
-  // For now we resolve as if the user watched the full ad.
-  console.info(`[ads] (stub) playing rewarded ad for slot: ${slot}`);
-  return { slot, watched: true };
+export async function playRewardedAd(slot: RewardSlot): Promise<AdResult> {
+  const reward = await showRewarded(slot);
+  return { slot, watched: reward !== null };
 }
 
 export async function playInterstitialAd(): Promise<AdResult> {
-  console.info("[ads] (stub) playing interstitial");
-  return { slot: "interstitial", watched: true };
+  const ok = await showInterstitial();
+  return { slot: "interstitial", watched: ok };
 }

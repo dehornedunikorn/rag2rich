@@ -8,8 +8,7 @@ import { RarityBadge } from "./RarityBadge";
 import { cn } from "@/lib/utils";
 import { Camera, Droplets, Flame, Tag, X, Check, Wand2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
-import { playRewardedAd } from "@/game/ads";
-import { AdModal } from "./AdModal";
+import { showRewarded } from "@/game/admob";
 
 type Mode = "menu" | "wash" | "iron" | "photo";
 
@@ -48,7 +47,6 @@ export const StudioScreen = ({
   const item = selected ? inventory.find((i) => i.id === selected.id) ?? null : null;
 
   const [mode, setMode] = useState<Mode>("menu");
-  const [magicAdOpen, setMagicAdOpen] = useState(false);
   useEffect(() => setMode("menu"), [selected?.id]);
 
   if (!item) {
@@ -69,8 +67,13 @@ export const StudioScreen = ({
 
         <button
           onClick={async () => {
-            setMagicAdOpen(true);
-            await playRewardedAd("magic_laundry");
+            const reward = await showRewarded("magic_laundry");
+            if (!reward) {
+              toast("Ad skipped — no reward");
+              return;
+            }
+            const n = repairAll();
+            toast.success("Magic Laundry done!", { description: `${n} items refreshed` });
           }}
           className="w-full p-4 rounded-2xl bg-gradient-to-r from-accent/20 to-primary/20 border border-accent/40 tap-scale flex items-center gap-3"
         >
@@ -83,22 +86,10 @@ export const StudioScreen = ({
         </button>
 
         <StudioPicks />
-
-        <AdModal
-          open={magicAdOpen}
-          title="Magic Laundry"
-          duration={5}
-          rewardLabel="All items repaired to 100%"
-          onComplete={() => {
-            setMagicAdOpen(false);
-            const n = repairAll();
-            toast.success("Magic Laundry done!", { description: `${n} items refreshed` });
-          }}
-          onSkip={() => setMagicAdOpen(false)}
-        />
       </div>
     );
   }
+
 
   const washerBonus = UPGRADES[0].levels[upgradeLevels.washer].bonus;
   const ironBonus = UPGRADES[1].levels[upgradeLevels.iron].bonus;

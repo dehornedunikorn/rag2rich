@@ -67,8 +67,13 @@ export const StudioScreen = ({
 
         <button
           onClick={async () => {
-            setMagicAdOpen(true);
-            await playRewardedAd("magic_laundry");
+            const reward = await showRewarded("magic_laundry");
+            if (!reward) {
+              toast("Ad skipped — no reward");
+              return;
+            }
+            const n = repairAll();
+            toast.success("Magic Laundry done!", { description: `${n} items refreshed` });
           }}
           className="w-full p-4 rounded-2xl bg-gradient-to-r from-accent/20 to-primary/20 border border-accent/40 tap-scale flex items-center gap-3"
         >
@@ -81,22 +86,6 @@ export const StudioScreen = ({
         </button>
 
         <StudioPicks />
-
-        <AdModal
-          open={magicAdOpen}
-          title="Magic Laundry"
-          duration={5}
-          rewardLabel="All items repaired to 100%"
-          onComplete={() => {
-            setMagicAdOpen(false);
-            const n = repairAll();
-            toast.success("Magic Laundry done!", { description: `${n} items refreshed` });
-          }}
-          onSkip={() => setMagicAdOpen(false)}
-        />
-      </div>
-    );
-  }
 
   const washerBonus = UPGRADES[0].levels[upgradeLevels.washer].bonus;
   const ironBonus = UPGRADES[1].levels[upgradeLevels.iron].bonus;

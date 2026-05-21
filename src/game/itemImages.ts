@@ -9,6 +9,7 @@ const variantModules = import.meta.glob<{ default: string }>(
 const byKind: Record<ItemKind, string[]> = {
   tshirt: [], shirt: [], jeans: [], dress: [], jacket: [],
   coat: [], hoodie: [], sneakers: [], bag: [], scarf: [],
+  blazer: [], skirt: [], cap: [], boots: [], suit: [],
 };
 
 for (const path in variantModules) {

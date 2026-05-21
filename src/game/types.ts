@@ -23,6 +23,11 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   { kind: "sneakers", name: "Sneakers",    emoji: "👟", weight: 0.9, baseValue: 120, rarity: "rare",     clicksToReveal: 5 },
   { kind: "jacket",   name: "Jacket",      emoji: "🧥", weight: 1.2, baseValue: 140, rarity: "rare",     clicksToReveal: 5 },
   { kind: "coat",     name: "Wool Coat",   emoji: "🧥", weight: 1.6, baseValue: 220, rarity: "epic",     clicksToReveal: 6 },
+  { kind: "cap",      name: "Cap",         emoji: "🧢", weight: 0.2, baseValue: 16,  rarity: "common",   clicksToReveal: 2 },
+  { kind: "skirt",    name: "Skirt",       emoji: "👚", weight: 0.4, baseValue: 32,  rarity: "uncommon", clicksToReveal: 3 },
+  { kind: "blazer",   name: "Blazer",      emoji: "🥼", weight: 0.9, baseValue: 110, rarity: "rare",     clicksToReveal: 4 },
+  { kind: "boots",    name: "Leather Boots",emoji: "🥾",weight: 1.3, baseValue: 160, rarity: "rare",     clicksToReveal: 5 },
+  { kind: "suit",     name: "Tailored Suit",emoji: "🤵",weight: 1.8, baseValue: 260, rarity: "epic",     clicksToReveal: 6 },
 ];
 
 export type Rarity = "common" | "uncommon" | "rare" | "epic" | "designer";

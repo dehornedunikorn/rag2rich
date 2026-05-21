@@ -86,6 +86,10 @@ export const StudioScreen = ({
         </button>
 
         <StudioPicks />
+      </div>
+    );
+  }
+
 
   const washerBonus = UPGRADES[0].levels[upgradeLevels.washer].bonus;
   const ironBonus = UPGRADES[1].levels[upgradeLevels.iron].bonus;

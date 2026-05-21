@@ -114,7 +114,7 @@ export async function showInterstitial(): Promise<boolean> {
     return true;
   }
   await initAdMob();
-  const options: InterstitialAdOptions = {
+  const options: AdOptions = {
     adId: ADMOB_IDS.interstitial,
     isTesting: false,
   };

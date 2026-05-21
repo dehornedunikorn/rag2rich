@@ -78,6 +78,18 @@ export const DESIGNER_ITEMS: DesignerItem[] = [
   { id: "drive_jacket",      name: "Scorpion Jacket",         description: "Real human bean. Real polyester satin.",                     baseValue: 2500, weight: 1.1, emoji: "🦂" },
   { id: "ferris_vest",       name: "Day Off Vest",            description: "Life moves pretty fast. So do these listings.",              baseValue: 1600, weight: 0.5, emoji: "🎡" },
   { id: "mclovin_id_tee",    name: "McLovin Tee",             description: "One name. No surname. Big mood.",                            baseValue: 1200, weight: 0.3, emoji: "🪪" },
+
+  // +10 new designer items
+  { id: "ghostbusters_pack", name: "Proton Pack Jumpsuit",    description: "Don't cross the streams. Or the listings.",                  baseValue: 2600, weight: 1.5, emoji: "👻" },
+  { id: "tron_suit",         name: "Grid Suit",               description: "End of line. Glow-in-the-dark seams.",                       baseValue: 3100, weight: 1.2, emoji: "🟦" },
+  { id: "pulp_fiction_suit", name: "Diner Dance Suit",        description: "Royale with cheese. Slim cut.",                              baseValue: 2800, weight: 1.4, emoji: "🕺" },
+  { id: "hannibal_mask_coat",name: "Quiet Lambs Coat",        description: "Wears the buyer's confidence like a fine chianti.",          baseValue: 2400, weight: 1.5, emoji: "🦋" },
+  { id: "miami_vice_blazer", name: "Pastel Vice Blazer",      description: "Sleeves rolled. T-shirt under. No socks. Ever.",             baseValue: 2000, weight: 0.8, emoji: "🌴" },
+  { id: "wayne_batsuit",     name: "Dark Knight Cape",        description: "It's not who I am underneath, but what I wear.",             baseValue: 3500, weight: 2.0, emoji: "🦇" },
+  { id: "spice_platforms",   name: "Spice Platforms",         description: "Tell me what you want, what you really really want.",        baseValue: 1800, weight: 1.2, emoji: "✌️" },
+  { id: "abba_jumpsuit",     name: "Dancing Queen Suit",      description: "Friday night and the lights are low.",                       baseValue: 2200, weight: 1.3, emoji: "🪩" },
+  { id: "prince_jacket",     name: "Purple Reign Jacket",     description: "Dearly beloved, we are gathered here today to flip this fit.",baseValue: 3000, weight: 1.4, emoji: "💜" },
+  { id: "hendrix_jacket",    name: "Voodoo Military Jacket",  description: "'Scuse me while I list this thrift.",                        baseValue: 2700, weight: 1.3, emoji: "🎸" },
 ].map(withImage);
 
 export const DESIGNER_BY_ID: Record<string, DesignerItem> =

@@ -240,7 +240,7 @@ export const useGame = create<GameState>()(
         const earned = sold.reduce((sum, l) => sum + l.price, 0);
         const newSales = s.totalSales + sold.length;
         const repBoosts = Math.floor(newSales / 100) - Math.floor(s.totalSales / 100);
-        const newRep = Math.max(0.5, s.reputation - repBoosts * 0.001);
+        const newRep = Math.max(0.5, s.reputation - repBoosts * 0.01);
         set({
           coins: s.coins + earned,
           listings: remaining,

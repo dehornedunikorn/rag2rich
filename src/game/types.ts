@@ -1,5 +1,6 @@
 export type ItemKind =
-  | "tshirt" | "shirt" | "jeans" | "dress" | "jacket" | "coat" | "hoodie" | "sneakers" | "bag" | "scarf";
+  | "tshirt" | "shirt" | "jeans" | "dress" | "jacket" | "coat" | "hoodie" | "sneakers" | "bag" | "scarf"
+  | "blazer" | "skirt" | "cap" | "boots" | "suit";
 
 export interface ItemTemplate {
   kind: ItemKind;

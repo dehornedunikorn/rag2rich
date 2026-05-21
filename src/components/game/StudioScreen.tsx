@@ -47,7 +47,6 @@ export const StudioScreen = ({
   const item = selected ? inventory.find((i) => i.id === selected.id) ?? null : null;
 
   const [mode, setMode] = useState<Mode>("menu");
-  const [magicAdOpen, setMagicAdOpen] = useState(false);
   useEffect(() => setMode("menu"), [selected?.id]);
 
   if (!item) {

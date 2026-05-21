@@ -8,25 +8,33 @@ import { MarketScreen } from "@/components/game/MarketScreen";
 import { ShopScreen } from "@/components/game/ShopScreen";
 import { StudioGallery } from "@/components/game/StudioGallery";
 import { AdBanner } from "@/components/game/AdBanner";
-import { AdModal } from "@/components/game/AdModal";
 import { FloatingAdIcons } from "@/components/game/FloatingAdIcons";
 import { InventoryItem } from "@/game/types";
 import { useFirebaseUser, useFirestoreSync } from "@/game/firestoreSync";
-import { playInterstitialAd } from "@/game/ads";
+import { initAdMob, showBanner, showInterstitial } from "@/game/admob";
+
+const INTERSTITIAL_INTERVAL_MS = 10 * 60 * 1000;
 
 const Index = () => {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [selected, setSelected] = useState<InventoryItem | null>(null);
   const [pendingList, setPendingList] = useState<InventoryItem | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [interstitialOpen, setInterstitialOpen] = useState(false);
 
   const { user } = useFirebaseUser();
   useFirestoreSync(user);
 
-  // 10-min interstitial loop
+  // AdMob lifecycle: initialize once, then show the persistent banner.
   useEffect(() => {
-    const t = setInterval(() => setInterstitialOpen(true), 10 * 60 * 1000);
+    (async () => {
+      await initAdMob();
+      await showBanner();
+    })();
+  }, []);
+
+  // 10-min interstitial loop (real AdMob on device, no-op on web)
+  useEffect(() => {
+    const t = setInterval(() => { void showInterstitial(); }, INTERSTITIAL_INTERVAL_MS);
     return () => clearInterval(t);
   }, []);
 
@@ -66,14 +74,6 @@ const Index = () => {
       <BottomNav active={screen} onChange={(s) => { setSelected(null); setGalleryOpen(false); setScreen(s); }} />
 
       <FloatingAdIcons />
-
-      <AdModal
-        open={interstitialOpen}
-        title="Sponsored Break"
-        duration={5}
-        onComplete={async () => { await playInterstitialAd(); setInterstitialOpen(false); }}
-        onSkip={() => setInterstitialOpen(false)}
-      />
     </div>
   );
 };

@@ -33,12 +33,21 @@ const STORAGE_COST := {"closet":0,"room":5000,"garage":12000,"container":25000}
 var current_screen := "dashboard"
 var coins := 350
 var inventory: Array[Dictionary] = []
+var storage_tier := "closet"
 var active_bale: Dictionary = {}
 var bottom_bar: HBoxContainer
 var content: VBoxContainer
 var coin_label: Label
+var bale_texture: Texture2D
+var item_textures: Dictionary = {}
 
 func _ready() -> void:
+	bale_texture = load("res://assets/bale.png")
+	for kind in ["tshirt","shirt","jeans","dress","jacket","coat","hoodie","sneakers","bag","scarf","blazer","skirt","cap","boots","suit"]:
+		var textures: Array[Texture2D] = []
+		for file_name in _variant_files(kind):
+			textures.append(load("res://assets/items/" + file_name))
+		item_textures[kind] = textures
 	_build_shell()
 	_show_screen("dashboard")
 
@@ -112,10 +121,20 @@ func _build_dashboard() -> void:
 			_build_placeholder("Storage full","Sell items or upgrade storage before unpacking more.")
 			return
 		var bale := Button.new()
-		bale.text = "🎁\n\nTAP TO UNBOX\n\n%s" % (str(active_bale.current.clicks_left)+" taps left" if not active_bale.current.is_empty() else "Mystery clothing inside")
 		bale.custom_minimum_size = Vector2(0,300)
-		bale.add_theme_font_size_override("font_size",28)
 		bale.pressed.connect(_click_bale)
+		var art := TextureRect.new()
+		art.texture = bale_texture
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bale.add_child(art)
+		var label := Label.new()
+		label.text = "TAP TO UNBOX · %s" % (str(active_bale.current.clicks_left)+" taps left" if not active_bale.current.is_empty() else "mystery clothing")
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+		label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bale.add_child(label)
 		content.add_child(bale)
 		return
 	_heading("Buy a Bale","Pick a mystery bundle and start unboxing.")
@@ -192,13 +211,10 @@ func _click_bale() -> void:
 	_show_screen("dashboard")
 
 func _variant_count(kind: String) -> int:
-	match kind:
-		"tshirt": return 3
-		"shirt","coat","dress","hoodie","jacket","jeans","scarf","sneakers","bag": return 2
-		_: return 1
+	return max(1, _variant_files(kind).size())
 
 func _capacity() -> int:
-	return int(STORAGE_CAPACITY.get("closet",15))
+	return int(STORAGE_CAPACITY[storage_tier])
 
 func _occupied() -> int:
 	return inventory.size()
@@ -209,16 +225,22 @@ func _build_inventory() -> void:
 		_build_placeholder("🧺 Closet empty","Buy a bale and start unboxing.")
 		return
 	for item in inventory:
-		var row := Button.new()
-		row.text = "%s  %s  ·  Condition %d%%" % [item.emoji,item.name,int(item.condition)]
-		row.custom_minimum_size.y = 64
-		content.add_child(row)
+		var card := Button.new()
+		card.custom_minimum_size.y = 84
+		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		card.text = "%s  %s  ·  Condition %d%%" % [item.emoji,item.name,int(item.condition)]
+		var texture := _item_texture(item)
+		if texture:
+			card.icon = texture
+			card.expand_icon = true
+		content.add_child(card)
 
 func _build_shop() -> void:
 	_heading("Shop","Storage upgrades")
 	for tier in ["room","garage","container"]:
 		var card := Button.new()
 		card.text = "%s storage · %d slots · %d coins" % [tier.capitalize(),STORAGE_CAPACITY[tier],STORAGE_COST[tier]]
+		card.disabled = coins < STORAGE_COST[tier] or _tier_rank(tier) <= _tier_rank(storage_tier)
 		card.pressed.connect(_buy_storage.bind(tier))
 		content.add_child(card)
 
@@ -226,8 +248,30 @@ func _buy_storage(tier: String) -> void:
 	if coins < STORAGE_COST[tier]:
 		return
 	coins -= STORAGE_COST[tier]
+	storage_tier = tier
 	_update_coins()
 	_show_screen("shop")
+
+func _variant_files(kind: String) -> Array[String]:
+	var result: Array[String] = []
+	var suffix := 1
+	while true:
+		var file_name := kind + (".jpg" if suffix == 1 else "_" + str(suffix) + ".jpg")
+		if not FileAccess.file_exists("res://assets/items/" + file_name):
+			break
+		result.append(file_name)
+		suffix += 1
+	return result
+
+func _item_texture(item: Dictionary) -> Texture2D:
+	var kind := str(item.kind)
+	var textures: Array = item_textures.get(kind, [])
+	if textures.is_empty():
+		return null
+	return textures[clampi(int(item.variant),0,textures.size()-1)]
+
+func _tier_rank(tier: String) -> int:
+	return ["closet","room","garage","container"].find(tier)
 
 func _build_placeholder(title: String, subtitle: String) -> void:
 	_heading(title,subtitle)

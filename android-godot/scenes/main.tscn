@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1"]
+[ext_resource type="Script" path="res://addons/AdmobPlugin/Admob.gd" id="2"]
 
 [node name="Rag2Rich" type="Control"]
 layout_mode = 3
@@ -10,3 +11,17 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+
+[node name="Admob" type="Node" parent="."]
+script = ExtResource("2")
+is_real = false
+max_ad_content_rating = 0
+banner_position = 1
+banner_size = 5
+android_debug_application_id = "ca-app-pub-3940256099942544~3347511713"
+android_real_application_id = "ca-app-pub-9803076819193345~9013349574"
+android_real_banner_id = "ca-app-pub-9803076819193345/8899696714"
+android_real_interstitial_id = "ca-app-pub-9803076819193345/8367693765"
+android_real_rewarded_id = "ca-app-pub-9803076819193345/2142716678"
+auto_configure_on_initialize = true
+auto_show_on_resume = true

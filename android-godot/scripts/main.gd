@@ -61,6 +61,24 @@ var process_direction := 1.0
 var timing_bar: ProgressBar
 var light_slider: HSlider
 var selected_lighting := 50.0
+var admob: Node
+var ad_spacer: Control
+var ad_overlay: Control
+var register_ad_button: Button
+var designer_ad_button: Button
+var reward_notice: Label
+var reward_notice_timer := 0.0
+var register_elapsed := 0.0
+var designer_elapsed := 0.0
+var register_visible_timer := 0.0
+var designer_visible_timer := 0.0
+var ads_consent_ready := false
+var banner_ad_loaded := false
+var rewarded_ad_loaded := false
+var rewarded_ad_load_requested := false
+var pending_reward_slot := ""
+var reward_preview_remaining := -1.0
+var reward_preview_bar: ProgressBar
 
 func _ready() -> void:
 	_load_game()
@@ -74,6 +92,8 @@ func _ready() -> void:
 		item_textures[kind] = textures
 	_build_shell()
 	_show_screen("dashboard")
+	_setup_ads()
+	_build_reward_overlay()
 
 func _create_game_theme() -> Theme:
 	var game_theme := Theme.new()
@@ -160,6 +180,254 @@ func _build_shell() -> void:
 		button.custom_minimum_size.y = 62
 		button.pressed.connect(_show_screen.bind(entry[1]))
 		bottom_bar.add_child(button)
+	ad_spacer = Control.new()
+	ad_spacer.custom_minimum_size.y = 60 if OS.has_feature("android") else 0
+	root.add_child(ad_spacer)
+
+func _setup_ads() -> void:
+	admob = get_node_or_null("Admob")
+	if admob == null or not OS.has_feature("android"):
+		return
+	admob.connect("initialization_completed", _on_admob_initialized)
+	admob.connect("consent_info_updated", _on_consent_info_updated)
+	admob.connect("consent_info_update_failed", _on_consent_info_failed)
+	admob.connect("consent_form_loaded", _on_consent_form_loaded)
+	admob.connect("consent_form_dismissed", _on_consent_form_dismissed)
+	admob.connect("consent_form_failed_to_load", _on_consent_form_failed)
+	admob.connect("banner_ad_loaded", _on_banner_ad_loaded)
+	admob.connect("rewarded_ad_loaded", _on_rewarded_ad_loaded)
+	admob.connect("rewarded_ad_failed_to_load", _on_rewarded_ad_failed)
+	admob.connect("rewarded_ad_user_earned_reward", _on_rewarded_ad_earned)
+	admob.connect("rewarded_ad_dismissed_full_screen_content", _on_rewarded_ad_dismissed)
+	admob.connect("rewarded_ad_failed_to_show_full_screen_content", _on_rewarded_ad_failed)
+	admob.call("initialize")
+
+func _on_admob_initialized(_status: Variant) -> void:
+	admob.call("update_consent_info")
+
+func _on_consent_info_updated() -> void:
+	var consent: Variant = admob.call("get_consent_status")
+	if consent == null:
+		return
+	if int(consent.status) == 1 or int(consent.status) == 3:
+		ads_consent_ready = true
+		_load_mobile_ads()
+	elif int(consent.status) == 2:
+		if bool(admob.call("is_consent_form_available")):
+			admob.call("show_consent_form")
+		else:
+			admob.call("load_consent_form")
+	else:
+		admob.call("load_consent_form")
+
+func _on_consent_form_loaded() -> void:
+	admob.call("show_consent_form")
+
+func _on_consent_form_dismissed(_error: Variant) -> void:
+	var consent: Variant = admob.call("get_consent_status")
+	if consent != null and (int(consent.status) == 1 or int(consent.status) == 3):
+		ads_consent_ready = true
+		_load_mobile_ads()
+
+func _on_consent_info_failed(_error: Variant) -> void:
+	ads_consent_ready = false
+
+func _on_consent_form_failed(_error: Variant) -> void:
+	ads_consent_ready = false
+
+func _load_mobile_ads() -> void:
+	if not ads_consent_ready:
+		return
+	if not banner_ad_loaded:
+		admob.call("load_banner_ad")
+	if not rewarded_ad_loaded and not rewarded_ad_load_requested:
+		rewarded_ad_load_requested = true
+		admob.call("load_rewarded_ad")
+
+func _on_banner_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
+	banner_ad_loaded = true
+	admob.call("show_banner_ad", ad_info.call("get_ad_id"))
+
+func _on_rewarded_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
+	rewarded_ad_load_requested = false
+	rewarded_ad_loaded = true
+	if pending_reward_slot != "":
+		admob.call("show_rewarded_ad", ad_info.call("get_ad_id"))
+
+func _on_rewarded_ad_failed(_ad_info: Variant, _error: Variant) -> void:
+	rewarded_ad_load_requested = false
+	rewarded_ad_loaded = false
+	if pending_reward_slot != "":
+		pending_reward_slot = ""
+		_show_reward_notice("Ad unavailable · no reward")
+
+func _on_rewarded_ad_earned(_ad_info: Variant, _reward: Variant) -> void:
+	var slot := pending_reward_slot
+	if slot == "":
+		return
+	pending_reward_slot = ""
+	rewarded_ad_loaded = false
+	_grant_ad_reward(slot)
+	_load_mobile_ads()
+
+func _on_rewarded_ad_dismissed(_ad_info: Variant) -> void:
+	if pending_reward_slot != "":
+		pending_reward_slot = ""
+		_show_reward_notice("Ad closed · no reward")
+	rewarded_ad_loaded = false
+	_load_mobile_ads()
+
+func _build_reward_overlay() -> void:
+	ad_overlay = Control.new()
+	ad_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ad_overlay.mouse_filter = Control.MOUSE_FILTER_PASS
+	add_child(ad_overlay)
+	register_ad_button = _action_button("✦\n20s", false)
+	register_ad_button.custom_minimum_size = Vector2(62,62)
+	register_ad_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	register_ad_button.offset_left = -82
+	register_ad_button.offset_top = -236
+	register_ad_button.offset_right = -20
+	register_ad_button.offset_bottom = -174
+	register_ad_button.visible = false
+	register_ad_button.pressed.connect(_request_reward.bind("golden_register"))
+	ad_overlay.add_child(register_ad_button)
+	designer_ad_button = _action_button("💎\n10s", false)
+	designer_ad_button.custom_minimum_size = Vector2(62,62)
+	designer_ad_button.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	designer_ad_button.offset_left = 20
+	designer_ad_button.offset_top = -236
+	designer_ad_button.offset_right = 82
+	designer_ad_button.offset_bottom = -174
+	designer_ad_button.visible = false
+	designer_ad_button.pressed.connect(_request_reward.bind("designer_drop"))
+	ad_overlay.add_child(designer_ad_button)
+	reward_notice = Label.new()
+	reward_notice.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	reward_notice.offset_left = 14
+	reward_notice.offset_top = 68
+	reward_notice.offset_right = -14
+	reward_notice.offset_bottom = 104
+	reward_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_notice.add_theme_color_override("font_color", Color("#f4d45c"))
+	reward_notice.visible = false
+	ad_overlay.add_child(reward_notice)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.visible = false
+	ad_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(330,230)
+	center.add_child(panel)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 14)
+	panel.add_child(body)
+	var title := Label.new()
+	title.text = "Sponsored · preview ad"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(title)
+	var ad_copy := Label.new()
+	ad_copy.text = "Reward after the preview finishes.\nSkipping gives no reward."
+	ad_copy.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(ad_copy)
+	reward_preview_bar = ProgressBar.new()
+	reward_preview_bar.max_value = 5
+	reward_preview_bar.value = 0
+	body.add_child(reward_preview_bar)
+	var skip := _action_button("Skip · no reward", false)
+	skip.pressed.connect(_skip_preview_reward)
+	body.add_child(skip)
+	center.name = "RewardPreview"
+	center.set_meta("panel", panel)
+	ad_overlay.set_meta("preview", center)
+
+func _show_reward_notice(message: String) -> void:
+	reward_notice.text = message
+	reward_notice.visible = true
+	reward_notice_timer = 3.0
+
+func _skip_preview_reward() -> void:
+	reward_preview_remaining = -1.0
+	var preview: Control = ad_overlay.get_meta("preview")
+	preview.visible = false
+	pending_reward_slot = ""
+	_show_reward_notice("Preview skipped · no reward")
+
+func _request_reward(slot: String) -> void:
+	if pending_reward_slot != "":
+		return
+	if slot == "golden_register":
+		register_ad_button.visible = false
+		register_visible_timer = 0.0
+	elif slot == "designer_drop":
+		designer_ad_button.visible = false
+		designer_visible_timer = 0.0
+	pending_reward_slot = slot
+	if OS.has_feature("editor"):
+		reward_preview_remaining = 5.0
+		reward_preview_bar.value = 0
+		var preview: Control = ad_overlay.get_meta("preview")
+		preview.visible = true
+		return
+	if not OS.has_feature("android") or not ads_consent_ready:
+		pending_reward_slot = ""
+		_show_reward_notice("Ads are not ready on this device")
+		return
+	if rewarded_ad_loaded:
+		rewarded_ad_loaded = false
+		admob.call("show_rewarded_ad")
+	elif not rewarded_ad_load_requested:
+		rewarded_ad_load_requested = true
+		admob.call("load_rewarded_ad")
+
+func _grant_ad_reward(slot: String) -> void:
+	match slot:
+		"magic_laundry":
+			var repaired := 0
+			for item in inventory:
+				if float(item.condition) < 100.0:
+					repaired += 1
+				item.condition = 100.0
+				item.washed = true
+				item.ironed = true
+			_save_game()
+			_show_reward_notice("Magic Laundry · %d items refreshed" % repaired)
+		"golden_register":
+			_sell_random_listings(5)
+		"designer_drop":
+			var item := _award_random_designer()
+			if item.is_empty():
+				_show_reward_notice("Storage full · no designer item")
+			else:
+				_show_reward_notice("Designer Drop · %s" % str(item.name))
+	if current_screen in ["studio", "inventory", "gallery", "market"]:
+		_show_screen(current_screen)
+
+func _sell_random_listings(amount: int) -> void:
+	var indices: Array[int] = []
+	for index in listings.size():
+		indices.append(index)
+	indices.shuffle()
+	var sold := mini(amount,indices.size())
+	if sold <= 0:
+		_show_reward_notice("Nothing was listed to sell")
+		return
+	var sold_ids: Array[String] = []
+	var remaining: Array[Dictionary] = []
+	var earned := 0
+	for index in range(sold):
+		var listing: Dictionary = listings[indices[index]]
+		sold_ids.append(str(listing.id))
+		earned += int(listing.price)
+	for listing in listings:
+		if not sold_ids.has(str(listing.id)):
+			remaining.append(listing)
+	listings = remaining
+	coins += earned
+	total_sales += sold
+	_update_coins()
+	_save_game()
+	_show_reward_notice("Golden Register · %d sold · +%d coins" % [sold,earned])
 
 func _show_screen(screen: String) -> void:
 	current_screen = screen
@@ -351,6 +619,9 @@ func _open_inventory_item(id: String) -> void:
 func _build_studio() -> void:
 	_heading("Processing Studio", "Choose an item and prepare it for the marketplace.")
 	if selected_item_id == "":
+		var laundry := _action_button("Magic Laundry · repair every item with a rewarded ad", false)
+		laundry.pressed.connect(_request_reward.bind("magic_laundry"))
+		content.add_child(laundry)
 		var gallery := _action_button("Designer Collection · 60 pieces", false)
 		gallery.pressed.connect(_show_screen.bind("gallery"))
 		content.add_child(gallery)
@@ -519,6 +790,38 @@ func _start_studio_mode(mode: String) -> void:
 	_show_screen("studio")
 
 func _process(delta: float) -> void:
+	if reward_preview_remaining >= 0.0:
+		reward_preview_remaining = maxf(0.0,reward_preview_remaining-delta)
+		reward_preview_bar.value = 5.0-reward_preview_remaining
+		if reward_preview_remaining == 0.0:
+			reward_preview_remaining = -1.0
+			(ad_overlay.get_meta("preview") as Control).visible = false
+			var slot := pending_reward_slot
+			pending_reward_slot = ""
+			_grant_ad_reward(slot)
+	if reward_notice_timer > 0.0:
+		reward_notice_timer = maxf(0.0,reward_notice_timer-delta)
+		if reward_notice_timer == 0.0:
+			reward_notice.visible = false
+	if pending_reward_slot == "" and (OS.has_feature("android") or OS.has_feature("editor")):
+		register_elapsed += delta
+		designer_elapsed += delta
+		if register_visible_timer > 0.0:
+			register_visible_timer = maxf(0.0,register_visible_timer-delta)
+			register_ad_button.text = "✦\n%d s" % ceili(register_visible_timer)
+			register_ad_button.visible = register_visible_timer > 0.0
+		elif register_elapsed >= 300.0:
+			register_elapsed = 0.0
+			register_visible_timer = 20.0
+			register_ad_button.visible = true
+		if designer_visible_timer > 0.0:
+			designer_visible_timer = maxf(0.0,designer_visible_timer-delta)
+			designer_ad_button.text = "💎\n%d s" % ceili(designer_visible_timer)
+			designer_ad_button.visible = designer_visible_timer > 0.0
+		elif designer_elapsed >= 900.0:
+			designer_elapsed = 0.0
+			designer_visible_timer = 10.0
+			designer_ad_button.visible = true
 	if current_screen == "market":
 		market_timer += delta
 		gift_timer += delta

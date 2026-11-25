@@ -1178,7 +1178,7 @@ func _process(delta: float) -> void:
 		reward_notice_timer = maxf(0.0,reward_notice_timer-delta)
 		if reward_notice_timer == 0.0:
 			reward_notice.visible = false
-	if pending_reward_slot == "" and (OS.has_feature("android") or OS.has_feature("editor")):
+	if ads_enabled and pending_reward_slot == "" and (OS.has_feature("android") or OS.has_feature("editor")):
 		register_elapsed += delta
 		designer_elapsed += delta
 		if register_visible_timer > 0.0:

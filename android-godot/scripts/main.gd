@@ -524,7 +524,7 @@ func _show_screen(screen: String) -> void:
 	for i in bottom_bar.get_child_count():
 		var b := bottom_bar.get_child(i) as Button
 		var selected_screen := "studio" if screen == "gallery" else screen
-		var selected := ["dashboard","inventory","studio","market","shop"][i] == selected_screen
+		var selected: bool = ["dashboard","inventory","studio","market","shop"][i] == selected_screen
 		b.modulate = Color.WHITE
 		b.add_theme_color_override("font_color",PURPLE if selected else MUTED)
 		b.add_theme_color_override("font_pressed_color",PURPLE)
@@ -734,7 +734,7 @@ func _click_bale() -> void:
 	if active_bale.is_empty() or _occupied() >= _capacity():
 		return
 	_animate_bale_tap()
-	var was_revealing := not active_bale.current.is_empty()
+	var was_revealing: bool = not active_bale.current.is_empty()
 	if active_bale.current.is_empty():
 		if active_bale.remaining <= 0.05:
 			active_bale.clear()

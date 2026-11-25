@@ -262,40 +262,44 @@ func _on_admob_initialized(_status: Variant) -> void:
 	admob.call("update_consent_info")
 
 func _on_consent_info_updated() -> void:
+	ads_consent_ready = false
 	if not ads_enabled:
-		ads_consent_ready = false
+		_refresh_reward_ad_ui()
 		return
 	var consent: Variant = admob.call("get_consent_status")
-	if consent == null:
-		return
-	if int(consent.status) == 1 or int(consent.status) == 3:
-		ads_consent_ready = true
-		_load_mobile_ads()
-	elif int(consent.status) == 2:
-		if bool(admob.call("is_consent_form_available")):
-			admob.call("show_consent_form")
+	if consent != null:
+		var status := int(consent.status)
+		if status == 1 or status == 3:
+			ads_consent_ready = true
+			_load_mobile_ads()
+		elif status == 2:
+			if bool(admob.call("is_consent_form_available")):
+				admob.call("show_consent_form")
+			else:
+				admob.call("load_consent_form")
 		else:
 			admob.call("load_consent_form")
-	else:
-		admob.call("load_consent_form")
+	_refresh_reward_ad_ui()
 
 func _on_consent_form_loaded() -> void:
 	admob.call("show_consent_form")
 
 func _on_consent_form_dismissed(_error: Variant) -> void:
-	if not ads_enabled:
-		ads_consent_ready = false
-		return
-	var consent: Variant = admob.call("get_consent_status")
-	if consent != null and (int(consent.status) == 1 or int(consent.status) == 3):
-		ads_consent_ready = true
-		_load_mobile_ads()
+	ads_consent_ready = false
+	if ads_enabled:
+		var consent: Variant = admob.call("get_consent_status")
+		if consent != null and (int(consent.status) == 1 or int(consent.status) == 3):
+			ads_consent_ready = true
+			_load_mobile_ads()
+	_refresh_reward_ad_ui()
 
 func _on_consent_info_failed(_error: Variant) -> void:
 	ads_consent_ready = false
+	_refresh_reward_ad_ui()
 
 func _on_consent_form_failed(_error: Variant) -> void:
 	ads_consent_ready = false
+	_refresh_reward_ad_ui()
 
 func _load_mobile_ads() -> void:
 	if not ads_enabled or not ads_consent_ready:
@@ -308,6 +312,35 @@ func _load_mobile_ads() -> void:
 	if not interstitial_ad_loaded and not interstitial_ad_load_requested:
 		interstitial_ad_load_requested = true
 		admob.call("load_interstitial_ad")
+
+func _can_offer_rewarded_ads() -> bool:
+	if OS.has_feature("editor"):
+		return true
+	return OS.has_feature("android") and ads_enabled and ads_consent_ready and is_instance_valid(admob)
+
+func _refresh_reward_ad_ui() -> void:
+	var available := _can_offer_rewarded_ads()
+	if not available:
+		if is_instance_valid(register_ad_button):
+			register_ad_button.visible = false
+		if is_instance_valid(designer_ad_button):
+			designer_ad_button.visible = false
+	if current_screen == "studio" and selected_item_id == "" and is_instance_valid(content):
+		_show_screen("studio")
+
+func _restore_reward_offer(slot: String) -> void:
+	if not _can_offer_rewarded_ads():
+		return
+	if slot == "golden_register" and is_instance_valid(register_ad_button):
+		register_elapsed = 0.0
+		register_visible_timer = 20.0
+		register_ad_button.text = "✦\n20 s"
+		register_ad_button.visible = true
+	elif slot == "designer_drop" and is_instance_valid(designer_ad_button):
+		designer_elapsed = 0.0
+		designer_visible_timer = 10.0
+		designer_ad_button.text = "💎\n10 s"
+		designer_ad_button.visible = true
 
 func _on_banner_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	if not ads_enabled or not ads_consent_ready:
@@ -356,7 +389,9 @@ func _on_rewarded_ad_failed(_ad_info: Variant, _error: Variant) -> void:
 	rewarded_ad_load_requested = false
 	rewarded_ad_loaded = false
 	if pending_reward_slot != "":
+		var failed_slot := pending_reward_slot
 		pending_reward_slot = ""
+		_restore_reward_offer(failed_slot)
 		_show_reward_notice("Ad unavailable · no reward")
 
 func _on_rewarded_ad_earned(_ad_info: Variant, _reward: Variant) -> void:
@@ -370,7 +405,9 @@ func _on_rewarded_ad_earned(_ad_info: Variant, _reward: Variant) -> void:
 
 func _on_rewarded_ad_dismissed(_ad_info: Variant) -> void:
 	if pending_reward_slot != "":
+		var dismissed_slot := pending_reward_slot
 		pending_reward_slot = ""
+		_restore_reward_offer(dismissed_slot)
 		_show_reward_notice("Ad closed · no reward")
 	rewarded_ad_loaded = false
 	_load_mobile_ads()
@@ -378,7 +415,7 @@ func _on_rewarded_ad_dismissed(_ad_info: Variant) -> void:
 func _build_reward_overlay() -> void:
 	ad_overlay = Control.new()
 	ad_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ad_overlay.mouse_filter = Control.MOUSE_FILTER_PASS
+	ad_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(ad_overlay)
 	register_ad_button = _action_button("✦\n20s", false)
 	register_ad_button.custom_minimum_size = Vector2(62,62)
@@ -454,6 +491,10 @@ func _skip_preview_reward() -> void:
 func _request_reward(slot: String) -> void:
 	if pending_reward_slot != "":
 		return
+	if not _can_offer_rewarded_ads():
+		_refresh_reward_ad_ui()
+		_show_reward_notice("Rewarded ads are not available until ad consent is ready")
+		return
 	if slot == "golden_register":
 		register_ad_button.visible = false
 		register_visible_timer = 0.0
@@ -466,10 +507,6 @@ func _request_reward(slot: String) -> void:
 		reward_preview_bar.value = 0
 		var preview: Control = ad_overlay.get_meta("preview")
 		preview.visible = true
-		return
-	if not OS.has_feature("android") or not ads_enabled or not ads_consent_ready:
-		pending_reward_slot = ""
-		_show_reward_notice("Ads are not ready on this device")
 		return
 	if rewarded_ad_loaded:
 		rewarded_ad_loaded = false
@@ -921,9 +958,10 @@ func _open_inventory_item(id: String) -> void:
 func _build_studio() -> void:
 	_heading("Processing Studio", "Choose an item and prepare it for the marketplace.")
 	if selected_item_id == "":
-		var laundry := _action_button("Magic Laundry · repair every item with a rewarded ad", false)
-		laundry.pressed.connect(_request_reward.bind("magic_laundry"))
-		content.add_child(laundry)
+		if _can_offer_rewarded_ads():
+			var laundry := _action_button("Magic Laundry · repair every item with a rewarded ad", false)
+			laundry.pressed.connect(_request_reward.bind("magic_laundry"))
+			content.add_child(laundry)
 		var gallery := _action_button("Designer Collection · 60 pieces", false)
 		gallery.pressed.connect(_show_screen.bind("gallery"))
 		content.add_child(gallery)
@@ -1178,7 +1216,7 @@ func _process(delta: float) -> void:
 		reward_notice_timer = maxf(0.0,reward_notice_timer-delta)
 		if reward_notice_timer == 0.0:
 			reward_notice.visible = false
-	if ads_enabled and pending_reward_slot == "" and (OS.has_feature("android") or OS.has_feature("editor")):
+	if _can_offer_rewarded_ads() and pending_reward_slot == "":
 		register_elapsed += delta
 		designer_elapsed += delta
 		if register_visible_timer > 0.0:
@@ -1197,6 +1235,11 @@ func _process(delta: float) -> void:
 			designer_elapsed = 0.0
 			designer_visible_timer = 10.0
 			designer_ad_button.visible = true
+	else:
+		if is_instance_valid(register_ad_button):
+			register_ad_button.visible = false
+		if is_instance_valid(designer_ad_button):
+			designer_ad_button.visible = false
 	if current_screen == "market":
 		market_timer += delta
 		gift_timer += delta
@@ -1728,6 +1771,7 @@ func _set_ads_enabled(enabled: bool) -> void:
 			admob.call("remove_interstitial_ad")
 			admob.call("remove_rewarded_ad")
 	_save_game()
+	_refresh_reward_ad_ui()
 
 func _buy_equipment(key: String, cost: int) -> void:
 	if int(upgrade_levels.get(key,0)) >= 3 or coins < cost:

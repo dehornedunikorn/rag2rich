@@ -1019,9 +1019,17 @@ func _load_designer_catalog() -> void:
 	for row in parsed:
 		if row is Dictionary:
 			designer_items.append(row)
-			var image_path := "res://assets/designer/" + str(row.id) + ".jpg"
-			if FileAccess.file_exists(image_path):
-				designer_textures[str(row.id)] = load(image_path)
+
+func _get_designer_texture(designer_id: String) -> Texture2D:
+	if designer_textures.has(designer_id):
+		return designer_textures[designer_id] as Texture2D
+	var image_path := "res://assets/designer/" + designer_id + ".jpg"
+	if not FileAccess.file_exists(image_path):
+		return null
+	var texture := load(image_path) as Texture2D
+	if texture != null:
+		designer_textures[designer_id] = texture
+	return texture
 
 func _build_gallery() -> void:
 	_heading("Studio Gallery", "%d / %d designer pieces discovered" % [discovered_designers.size(),designer_items.size()])
@@ -1039,9 +1047,11 @@ func _build_gallery() -> void:
 		card.custom_minimum_size = Vector2(104,112)
 		card.text = "%s\n%s" % [str(designer.emoji) if owned else "🔒",str(designer.name) if owned else "Undiscovered"]
 		card.disabled = not owned
-		if owned and designer_textures.has(str(designer.id)):
-			card.icon = designer_textures[str(designer.id)]
-			card.expand_icon = true
+		if owned:
+			var designer_texture := _get_designer_texture(str(designer.id))
+			if designer_texture != null:
+				card.icon = designer_texture
+				card.expand_icon = true
 		card.pressed.connect(_open_designer_detail.bind(str(designer.id)))
 		grid.add_child(card)
 
@@ -1060,7 +1070,7 @@ func _build_designer_detail() -> void:
 		_show_screen("gallery")
 		return
 	_heading(str(selected.name), "Designer piece · %d coins" % int(selected.base_value))
-	var texture: Texture2D = designer_textures.get(selected_designer_id)
+	var texture: Texture2D = _get_designer_texture(selected_designer_id)
 	if texture:
 		var portrait := TextureRect.new()
 		portrait.custom_minimum_size = Vector2(0,340)
@@ -1174,7 +1184,8 @@ func _process(delta: float) -> void:
 			gift_timer = 0.0
 			if randf() < 0.05:
 				gift_open = true
-				_show_screen("market")
+				if pending_market_item_id == "":
+					_show_screen("market")
 		if market_timer >= 2.5:
 			market_timer = 0.0
 			_tick_market()
@@ -1523,7 +1534,7 @@ func _tick_market() -> void:
 		reputation = maxf(0.5,reputation - boost * 0.01)
 		_update_coins()
 	_save_game()
-	if current_screen == "market":
+	if current_screen == "market" and pending_market_item_id == "":
 		_show_screen("market")
 	if sold_count > 0:
 		_show_reward_notice("Market sale · %d item%s · +%d coins" % [sold_count,"" if sold_count == 1 else "s",earned])
@@ -1720,7 +1731,7 @@ func _variant_files(kind: String) -> Array[String]:
 
 func _item_texture(item: Dictionary) -> Texture2D:
 	if item.has("designer_id"):
-		return designer_textures.get(str(item.designer_id))
+		return _get_designer_texture(str(item.designer_id))
 	var kind := str(item.kind)
 	var textures: Array = item_textures.get(kind, [])
 	if textures.is_empty():

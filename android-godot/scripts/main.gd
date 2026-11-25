@@ -1131,10 +1131,10 @@ func _process(delta: float) -> void:
 			interstitial_elapsed = 0.0
 			if interstitial_ad_loaded:
 				interstitial_ad_loaded = false
-			admob.call("show_interstitial_ad")
+				admob.call("show_interstitial_ad")
 			else:
-			interstitial_show_pending = true
-			_load_mobile_ads()
+				interstitial_show_pending = true
+				_load_mobile_ads()
 	if reward_preview_remaining >= 0.0:
 		reward_preview_remaining = maxf(0.0,reward_preview_remaining-delta)
 		reward_preview_bar.value = 5.0-reward_preview_remaining

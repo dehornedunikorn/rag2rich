@@ -30,6 +30,7 @@ const RARITY_WEIGHTS := {"common":50.0,"uncommon":28.0,"rare":14.0,"epic":5.0}
 const STORAGE_CAPACITY := {"closet":15,"room":30,"garage":100,"container":200}
 const STORAGE_COST := {"closet":0,"room":5000,"garage":12000,"container":25000}
 const SAVE_VERSION := 1
+const INTERSTITIAL_INTERVAL := 600.0
 
 var current_screen := "dashboard"
 var gallery_return_screen := "studio"
@@ -49,6 +50,15 @@ var active_bale: Dictionary = {}
 var bottom_bar: HBoxContainer
 var content: VBoxContainer
 var coin_label: Label
+var display_font: Font
+var bale_name_label: Label
+var bale_weight_label: Label
+var bale_tap_button: Button
+var bale_tap_art: TextureRect
+var bale_hint_label: Label
+var bale_rarity_label: Label
+var bale_progress_bar: ProgressBar
+var bale_reveal_progress: ProgressBar
 var bale_texture: Texture2D
 var item_textures: Dictionary = {}
 var designer_items: Array[Dictionary] = []
@@ -78,6 +88,10 @@ var register_visible_timer := 0.0
 var designer_visible_timer := 0.0
 var ads_consent_ready := false
 var banner_ad_loaded := false
+var interstitial_elapsed := 0.0
+var interstitial_ad_loaded := false
+var interstitial_ad_load_requested := false
+var interstitial_show_pending := false
 var rewarded_ad_loaded := false
 var rewarded_ad_load_requested := false
 var pending_reward_slot := ""
@@ -87,6 +101,7 @@ var reward_preview_bar: ProgressBar
 func _ready() -> void:
 	_load_game()
 	_load_designer_catalog()
+	display_font = load("res://assets/fonts/SpaceGrotesk-Variable.ttf") as Font
 	theme = _create_game_theme()
 	bale_texture = load("res://assets/bale.png")
 	for kind in ["tshirt","shirt","jeans","dress","jacket","coat","hoodie","sneakers","bag","scarf","blazer","skirt","cap","boots","suit"]:
@@ -102,6 +117,7 @@ func _ready() -> void:
 func _create_game_theme() -> Theme:
 	var game_theme := Theme.new()
 	game_theme.default_font_size = 15
+	game_theme.default_font = load("res://assets/fonts/Inter-Variable.ttf") as Font
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = PANEL
 	normal.border_color = Color("#393144")
@@ -156,10 +172,16 @@ func _notification(what: int) -> void:
 			get_tree().quit()
 
 func _build_shell() -> void:
+	var background := ColorRect.new()
+	background.color = BG
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
 	var root := VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.add_theme_constant_override("separation", 0)
 	add_child(root)
+	move_child(background,0)
 	var top := HBoxContainer.new()
 	top.custom_minimum_size.y = 64
 	top.add_theme_constant_override("separation", 12)
@@ -168,6 +190,7 @@ func _build_shell() -> void:
 	brand.text = "RAG 2 RICH"
 	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	brand.add_theme_font_size_override("font_size", 22)
+	brand.add_theme_font_override("font",display_font)
 	brand.add_theme_color_override("font_color", PURPLE)
 	top.add_child(brand)
 	coin_label = Label.new()
@@ -197,6 +220,7 @@ func _build_shell() -> void:
 		button.text = entry[0]
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.custom_minimum_size.y = 62
+		button.add_theme_font_size_override("font_size",12)
 		button.pressed.connect(_show_screen.bind(entry[1]))
 		bottom_bar.add_child(button)
 	ad_spacer = Control.new()
@@ -214,11 +238,16 @@ func _setup_ads() -> void:
 	admob.connect("consent_form_dismissed", _on_consent_form_dismissed)
 	admob.connect("consent_form_failed_to_load", _on_consent_form_failed)
 	admob.connect("banner_ad_loaded", _on_banner_ad_loaded)
+	admob.connect("interstitial_ad_loaded", _on_interstitial_ad_loaded)
+	admob.connect("interstitial_ad_failed_to_load", _on_interstitial_ad_failed_to_load)
+	admob.connect("interstitial_ad_dismissed_full_screen_content", _on_interstitial_ad_dismissed)
+	admob.connect("interstitial_ad_failed_to_show_full_screen_content", _on_interstitial_ad_failed_to_show)
 	admob.connect("rewarded_ad_loaded", _on_rewarded_ad_loaded)
 	admob.connect("rewarded_ad_failed_to_load", _on_rewarded_ad_failed)
 	admob.connect("rewarded_ad_user_earned_reward", _on_rewarded_ad_earned)
 	admob.connect("rewarded_ad_dismissed_full_screen_content", _on_rewarded_ad_dismissed)
 	admob.connect("rewarded_ad_failed_to_show_full_screen_content", _on_rewarded_ad_failed)
+	admob.set("remove_interstitial_ads_after_displayed", true)
 	admob.call("initialize")
 
 func _on_admob_initialized(_status: Variant) -> void:
@@ -262,10 +291,34 @@ func _load_mobile_ads() -> void:
 	if not rewarded_ad_loaded and not rewarded_ad_load_requested:
 		rewarded_ad_load_requested = true
 		admob.call("load_rewarded_ad")
+	if not interstitial_ad_loaded and not interstitial_ad_load_requested:
+		interstitial_ad_load_requested = true
+		admob.call("load_interstitial_ad")
 
 func _on_banner_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	banner_ad_loaded = true
 	admob.call("show_banner_ad", ad_info.call("get_ad_id"))
+
+func _on_interstitial_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
+	interstitial_ad_load_requested = false
+	interstitial_ad_loaded = true
+	if interstitial_show_pending and pending_reward_slot == "":
+		interstitial_show_pending = false
+		interstitial_ad_loaded = false
+		admob.call("show_interstitial_ad", ad_info.call("get_ad_id"))
+
+func _on_interstitial_ad_failed_to_load(_ad_info: Variant, _error: Variant) -> void:
+	interstitial_ad_load_requested = false
+	interstitial_ad_loaded = false
+	interstitial_show_pending = false
+
+func _on_interstitial_ad_dismissed(_ad_info: Variant) -> void:
+	interstitial_ad_loaded = false
+	_load_mobile_ads()
+
+func _on_interstitial_ad_failed_to_show(_ad_info: Variant, _error: Variant) -> void:
+	interstitial_ad_loaded = false
+	_load_mobile_ads()
 
 func _on_rewarded_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	rewarded_ad_load_requested = false
@@ -465,12 +518,16 @@ func _show_screen(screen: String) -> void:
 	for i in bottom_bar.get_child_count():
 		var b := bottom_bar.get_child(i) as Button
 		var selected_screen := "studio" if screen == "gallery" else screen
-		b.modulate = PURPLE if ["dashboard","inventory","studio","market","shop"][i] == selected_screen else MUTED
+		var selected := ["dashboard","inventory","studio","market","shop"][i] == selected_screen
+		b.modulate = Color.WHITE
+		b.add_theme_color_override("font_color",PURPLE if selected else MUTED)
+		b.add_theme_color_override("font_pressed_color",PURPLE)
 
 func _heading(title: String, subtitle: String) -> void:
 	var h := Label.new()
 	h.text = title
 	h.add_theme_font_size_override("font_size", 25)
+	h.add_theme_font_override("font",display_font)
 	h.add_theme_color_override("font_color", Color("#f5effb"))
 	content.add_child(h)
 	var s := Label.new()
@@ -480,41 +537,86 @@ func _heading(title: String, subtitle: String) -> void:
 
 func _build_dashboard() -> void:
 	if not active_bale.is_empty():
-		_heading(str(active_bale.def.name), "%.2f / %.0f kg left · tap to reveal" % [active_bale.remaining, active_bale.def.weight])
+		bale_name_label = Label.new()
+		bale_name_label.text = str(active_bale.def.name)
+		bale_name_label.add_theme_font_size_override("font_size",25)
+		bale_name_label.add_theme_font_override("font",display_font)
+		bale_name_label.add_theme_color_override("font_color",Color("#f5effb"))
+		content.add_child(bale_name_label)
+		bale_weight_label = Label.new()
+		bale_weight_label.add_theme_color_override("font_color",MUTED)
+		content.add_child(bale_weight_label)
 		var close_bale := _action_button("Put bale away", false)
 		close_bale.pressed.connect(_close_bale)
 		content.add_child(close_bale)
-		var bale_progress := ProgressBar.new()
-		bale_progress.max_value = float(active_bale.def.weight)
-		bale_progress.value = float(active_bale.def.weight) - float(active_bale.remaining)
-		bale_progress.custom_minimum_size.y = 18
-		content.add_child(bale_progress)
+		bale_progress_bar = ProgressBar.new()
+		bale_progress_bar.max_value = float(active_bale.def.weight)
+		bale_progress_bar.custom_minimum_size.y = 18
+		content.add_child(bale_progress_bar)
 		if _occupied() >= _capacity():
+			_update_active_bale_display()
 			_build_placeholder("Storage full","Sell items or upgrade storage before unpacking more.")
 			return
-		var bale := Button.new()
-		bale.custom_minimum_size = Vector2(0,300)
-		bale.pressed.connect(_click_bale)
-		var art := TextureRect.new()
-		art.texture = bale_texture
-		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		bale.add_child(art)
-		var label := Label.new()
-		label.text = "TAP TO UNBOX · %s" % (str(active_bale.current.clicks_left)+" taps left" if not active_bale.current.is_empty() else "mystery clothing")
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-		label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		bale.add_child(label)
-		content.add_child(bale)
-		if not active_bale.current.is_empty():
-			var current: Dictionary = active_bale.current
-			var reveal_progress := ProgressBar.new()
-			reveal_progress.max_value = float(current.total_clicks)
-			reveal_progress.value = float(current.total_clicks) - float(current.clicks_left)
-			reveal_progress.custom_minimum_size.y = 18
-			content.add_child(reveal_progress)
+		bale_tap_button = Button.new()
+		bale_tap_button.custom_minimum_size = Vector2(0,340)
+		bale_tap_button.pressed.connect(_click_bale)
+		var art_layer := Control.new()
+		art_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		art_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bale_tap_button.add_child(art_layer)
+		bale_tap_art = TextureRect.new()
+		bale_tap_art.texture = bale_texture
+		bale_tap_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		bale_tap_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		bale_tap_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bale_tap_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art_layer.add_child(bale_tap_art)
+		var shade := ColorRect.new()
+		shade.color = Color(0.06,0.04,0.09,0.38)
+		shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art_layer.add_child(shade)
+		var hint_panel := PanelContainer.new()
+		hint_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		hint_panel.offset_left = 10
+		hint_panel.offset_top = -94
+		hint_panel.offset_right = -10
+		hint_panel.offset_bottom = -10
+		hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art_layer.add_child(hint_panel)
+		var hint_row := HBoxContainer.new()
+		hint_row.add_theme_constant_override("separation",10)
+		hint_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hint_panel.add_child(hint_row)
+		bale_hint_label = Label.new()
+		bale_hint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bale_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hint_row.add_child(bale_hint_label)
+		bale_rarity_label = Label.new()
+		bale_rarity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hint_row.add_child(bale_rarity_label)
+		var tap_label := Label.new()
+		tap_label.text = "TAP TO UNBOX"
+		tap_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tap_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+		tap_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		tap_label.offset_top = 14
+		tap_label.offset_bottom = 46
+		tap_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tap_label.add_theme_color_override("font_color",Color.WHITE)
+		tap_label.add_theme_color_override("font_shadow_color",Color.BLACK)
+		tap_label.add_theme_constant_override("shadow_offset_x",1)
+		tap_label.add_theme_constant_override("shadow_offset_y",1)
+		art_layer.add_child(tap_label)
+		content.add_child(bale_tap_button)
+		bale_reveal_progress = ProgressBar.new()
+		bale_reveal_progress.custom_minimum_size.y = 14
+		content.add_child(bale_reveal_progress)
+		_update_active_bale_display()
+		_build_placeholder("Storage · %d / %d slots" % [_occupied(),_capacity()],"Your Closet and Market share storage space.")
+		var closet_button := _action_button("View Closet",false)
+		closet_button.pressed.connect(_show_screen.bind("inventory"))
+		content.add_child(closet_button)
 		return
 	_heading("Buy a Bale","Pick a mystery bundle and start unboxing.")
 	_build_placeholder("Storage: %d / %d slots" % [_occupied(),_capacity()],"Inventory and marketplace listings both use storage.")
@@ -541,6 +643,45 @@ func _close_bale() -> void:
 	_save_game()
 	_show_screen("dashboard")
 
+func _update_active_bale_display() -> void:
+	if active_bale.is_empty():
+		return
+	if is_instance_valid(bale_name_label):
+		bale_name_label.text = str(active_bale.def.name)
+	if is_instance_valid(bale_weight_label):
+		bale_weight_label.text = "%.2f / %.0f kg left" % [float(active_bale.remaining),float(active_bale.def.weight)]
+	if is_instance_valid(bale_progress_bar):
+		bale_progress_bar.value = float(active_bale.def.weight)-float(active_bale.remaining)
+	if is_instance_valid(bale_hint_label) and is_instance_valid(bale_rarity_label) and is_instance_valid(bale_reveal_progress):
+		if active_bale.current.is_empty():
+			bale_hint_label.text = "Mystery clothing · tap to start unboxing"
+			bale_rarity_label.text = ""
+			bale_reveal_progress.visible = false
+		else:
+			var current: Dictionary = active_bale.current
+			var template: Dictionary = current.template
+			bale_hint_label.text = "Something %s · %d taps left" % ["heavy" if float(template.weight) >= 1.0 else "light",int(current.clicks_left)]
+			bale_rarity_label.text = str(template.rarity).capitalize()
+			bale_rarity_label.add_theme_color_override("font_color",_rarity_color(str(template.rarity)))
+			bale_reveal_progress.max_value = float(current.total_clicks)
+			bale_reveal_progress.value = float(current.total_clicks)-float(current.clicks_left)
+			bale_reveal_progress.visible = true
+
+func _animate_bale_tap() -> void:
+	if not is_instance_valid(bale_tap_button):
+		return
+	var tween := create_tween()
+	tween.tween_property(bale_tap_button,"scale",Vector2(0.97,0.97),0.05)
+	tween.tween_property(bale_tap_button,"scale",Vector2.ONE,0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _rarity_color(rarity: String) -> Color:
+	match rarity:
+		"uncommon": return Color("#63d9a1")
+		"rare": return Color("#8a8cff")
+		"epic": return Color("#cf75ff")
+		"designer": return Color("#e7bb4b")
+		_: return MUTED
+
 func _weighted_item(boost: float) -> Dictionary:
 	var weights: Array[float] = []
 	var total := 0.0
@@ -560,6 +701,7 @@ func _weighted_item(boost: float) -> Dictionary:
 func _click_bale() -> void:
 	if active_bale.is_empty() or _occupied() >= _capacity():
 		return
+	_animate_bale_tap()
 	if active_bale.current.is_empty():
 		if active_bale.remaining <= 0.05:
 			active_bale.clear()
@@ -579,8 +721,7 @@ func _click_bale() -> void:
 	if current.clicks_left > 0:
 		active_bale.current = current
 		_save_game()
-		_show_screen("dashboard")
-		_show_reward_notice("Keep unboxing · %d taps left" % current.clicks_left)
+		_update_active_bale_display()
 		return
 	var t: Dictionary = current.template
 	var variants := _variant_count(str(t.kind))
@@ -597,7 +738,13 @@ func _click_bale() -> void:
 	if active_bale.remaining <= 0.05:
 		active_bale.clear()
 	_save_game()
-	_show_screen("dashboard")
+		_show_screen("dashboard")
+	elif _occupied() >= _capacity():
+		_save_game()
+		_show_screen("dashboard")
+	else:
+		_save_game()
+		_update_active_bale_display()
 	_show_reward_notice("Found %s · %.1f kg · %s" % [item.name,item.weight,str(item.rarity).capitalize()])
 
 func _variant_count(kind: String) -> int:
@@ -879,6 +1026,16 @@ func _start_studio_mode(mode: String) -> void:
 	_show_screen("studio")
 
 func _process(delta: float) -> void:
+	if OS.has_feature("android") and ads_consent_ready and pending_reward_slot == "":
+		interstitial_elapsed += delta
+		if interstitial_elapsed >= INTERSTITIAL_INTERVAL:
+			interstitial_elapsed = 0.0
+			if interstitial_ad_loaded:
+				interstitial_ad_loaded = false
+			admob.call("show_interstitial_ad")
+			else:
+			interstitial_show_pending = true
+			_load_mobile_ads()
 	if reward_preview_remaining >= 0.0:
 		reward_preview_remaining = maxf(0.0,reward_preview_remaining-delta)
 		reward_preview_bar.value = 5.0-reward_preview_remaining

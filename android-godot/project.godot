@@ -3,7 +3,11 @@ config_version=5
 
 [application]
 config/name="RAG2RICH"
+config/description="Native Android port of the RAG2RICH resale tycoon game."
+config/version="0.1.0"
+config/quit_on_go_back=false
 run/main_scene="res://scenes/main.tscn"
+run/max_fps=60
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [display]
@@ -12,6 +16,7 @@ window/size/viewport_height=960
 window/size/window_width_override=432
 window/size/window_height_override=960
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/handheld/orientation=1
 
 [rendering]

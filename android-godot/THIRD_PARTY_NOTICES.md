@@ -9,3 +9,9 @@
 - License: MIT; the full license is in [addons/AdmobPlugin/LICENSE](addons/AdmobPlugin/LICENSE).
 
 The plugin archive was verified against the release checksum before its Android plugin scripts and AAR libraries were copied into this project.
+
+## Inter and Space Grotesk fonts
+
+- Fonts: Inter Variable and Space Grotesk Variable, used by the original web game and bundled for offline Android rendering.
+- Source: [Google Fonts repository](https://github.com/google/fonts/tree/main/ofl/inter) and [Space Grotesk files](https://github.com/google/fonts/tree/main/ofl/spacegrotesk).
+- License: SIL Open Font License 1.1; full license texts are in [assets/fonts/INTER-OFL.txt](assets/fonts/INTER-OFL.txt) and [assets/fonts/SPACE-GROTESK-OFL.txt](assets/fonts/SPACE-GROTESK-OFL.txt).

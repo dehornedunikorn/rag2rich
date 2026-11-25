@@ -13,17 +13,17 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 | Module | Completion | Evidence / remaining |
 |---|---:|---|
 | Original source and asset audit | 80% | Bale/item rules, Studio minigames, marketplace probability, ad rewards, gifts, webshop, storage, upgrades, reset behavior and designer rewards have been checked against the source. Auth/cloud edge cases and several peripheral flows remain. |
-| Godot project foundation | 65% | Godot 4.7 portrait project, themed five-tab shell, nested gallery navigation, Android back navigation, local saves and the Android AdMob plugin are integrated. Android export/device validation remains. |
-| Original visual recreation | 60% | Original bale art, all 26 item images and 55 designer images are in the project. Inventory and Studio use image cards with rarity accents; photo mode now has a live item preview, backdrop choices and quality estimate. Typography and visual-device review remain. |
-| Bale / item gameplay | 60% | Bale prices, starting coins, 15 item templates, rarity-weighted selection, repeated tap reveal, bale/reveal progress, item weights, conditions, item variants, close/save state and reveal feedback are implemented. Animation/audio polish and fidelity validation remain. |
+| Godot project foundation | 80% | Godot 4.7 portrait project, five-tab shell, nested gallery and Android back navigation, local saves, AdMob plugin and Gradle Android debug APK preset are integrated. Export and device validation remain. |
+| Original visual recreation | 80% | Original bale art, all 26 item images and 55 designer images are in the project. Inter and Space Grotesk are bundled with their licenses; image grids, rarity accents, live bale hints and the photo preview/backdrop/quality controls are implemented. Device visual review and remaining detail polish remain. |
+| Bale / item gameplay | 80% | Bale prices, starting coins, 15 item templates, rarity-weighted selection, repeated tap reveal, bale/reveal progress, item weights, conditions, variants, in-place reveal updates, tap animation, close/save state and storage feedback are implemented. Audio polish and gameplay balance validation remain. |
 | Inventory and studio processing | 90% | Closet capacity and selection, original item images, wash/iron timing games, photo composition with backdrop and lighting selection, explicit photo capture, listing handoff, persistent designer discovery and rewarded Magic Laundry/designer drops are implemented. Android device visual validation remains. |
 | Marketplace and economy | 100% | Source-matched listing fee and suggested price, live fair/pricey/overpriced quote, market sale probability/ticks, reputation milestones, five-upload gifts, webshop fee/speed bonuses, pull/unlist flow and rewarded five-listing sales are implemented. Android device QA is tracked in the build/release module. |
 | Upgrades and webshop | 83% | Sequential storage tiers, all three equipment tracks, source prices/effects, webshop unlock and confirmed progress reset are implemented. Progression balance and device validation remain. |
 | Save / cloud / offline progression | 85% | Versioned local ConfigFile saves cover game state and listing ticks; save loads validate values and recover from a backup file. Cloud sync and offline market progression remain unimplemented. |
-| AdMob and GDPR/UMP | 75% | Godot AdMob v7 is integrated with test IDs by default, startup UMP consent, a banner, rewarded ads, editor-only preview ads and all three reward actions. A dedicated privacy-options entry point and Android/device ad validation remain. |
-| Android build, optimization and release tests | 8% | Godot 4.7.2 headless import and project launch succeeded with the AdMob plugin enabled. No JDK/Android SDK/ADB is available here, so APK/AAB export, Android device test, performance pass and release check remain. |
+| AdMob and GDPR/UMP | 80% | Godot AdMob v7 is integrated with test IDs by default, startup UMP consent, banner and rewarded ads, all three reward actions, and source-matched 10-minute interstitials. A dedicated privacy-options entry point and Android/device ad validation remain. |
+| Android build, optimization and release tests | 15% | A Gradle Android debug APK preset is configured for package `com.ragtorich.game`, ARM64 and target API 36. Godot can import and launch the project, but no JDK/Android SDK/ADB is available here, so APK export, Android device test, performance pass and release check remain. |
 
-**Overall implementation estimate: 71%.** This is the equal-weight mean of the ten module estimates above (70.6%, rounded). The marketplace/economy module is complete at the ported feature level. Cloud sync, the UMP privacy-options entry point, complete visual fidelity and Android release validation remain.
+**Overall implementation estimate: 77%.** This is the equal-weight mean of the ten module estimates above (77.3%, rounded). All modules that can be advanced without the unavailable Android toolchain or external cloud credentials are now at or above 80%; the Android build and release module remains below that threshold. Cloud sync, a UMP privacy-options entry point and Android release validation remain.
 
 ## Assets
 
@@ -31,7 +31,8 @@ The Android project includes the original bale image, 26 clothing images, 55 des
 
 ## Verification
 
-- Godot 4.7.2 headless editor import and project launch completed with the AdMob v7 plugin enabled and no script parse errors.
+- Godot 4.7.2 headless editor import and project launch completed with the AdMob v7 plugin enabled and no script parse errors before the latest font, export-preset, bale-feedback and interstitial changes.
+- `git diff --check` passed after the latest changes. The Android export preset and latest runtime changes have not been validated in Godot in this environment.
 - The Android AdMob v7.0 archive SHA-256 was verified against its GitHub release metadata before importing the plugin and AAR files.
 - No Android APK/AAB export or real-device test has been performed.
 
@@ -39,6 +40,6 @@ The Android project includes the original bale image, 26 clothing images, 55 des
 
 1. Install/configure the Android export toolchain, then produce and test an APK/AAB on Android hardware.
 2. Add a user-accessible UMP privacy-options entry point and validate the consent flow on device.
-3. Recreate typography and remaining visual details using only original assets.
+3. Add a user-accessible UMP privacy-options entry point and validate consent on device.
 4. Audit and tune bale, storage and marketplace progression together.
 5. Complete the visual, performance and release validation passes.

@@ -444,6 +444,7 @@ func _build_reward_overlay() -> void:
 	reward_notice.offset_right = -14
 	reward_notice.offset_bottom = 104
 	reward_notice.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	reward_notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	reward_notice.add_theme_color_override("font_color", Color("#f4d45c"))
 	reward_notice.visible = false
 	ad_overlay.add_child(reward_notice)

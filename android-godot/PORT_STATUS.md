@@ -39,7 +39,6 @@ The Android project includes the original bale image, 26 clothing images, 55 des
 ## Next steps
 
 1. Install/configure the Android export toolchain, then produce and test an APK/AAB on Android hardware.
-2. Add a user-accessible UMP privacy-options entry point and validate the consent flow on device.
-3. Add a user-accessible UMP privacy-options entry point and validate consent on device.
-4. Audit and tune bale, storage and marketplace progression together.
-5. Complete the visual, performance and release validation passes.
+2. Add a user-accessible UMP privacy-options entry point and validate consent on device.
+3. Audit and tune bale, storage and marketplace progression together.
+4. Complete the visual, performance and release validation passes.

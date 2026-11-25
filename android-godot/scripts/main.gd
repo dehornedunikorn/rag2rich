@@ -738,12 +738,9 @@ func _click_bale() -> void:
 	if active_bale.remaining <= 0.05:
 		active_bale.clear()
 	_save_game()
-		_show_screen("dashboard")
-	elif _occupied() >= _capacity():
-		_save_game()
+	if active_bale.is_empty() or _occupied() >= _capacity():
 		_show_screen("dashboard")
 	else:
-		_save_game()
 		_update_active_bale_display()
 	_show_reward_notice("Found %s · %.1f kg · %s" % [item.name,item.weight,str(item.rarity).capitalize()])
 

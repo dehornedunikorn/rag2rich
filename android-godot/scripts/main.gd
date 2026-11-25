@@ -49,6 +49,8 @@ var storage_tier := "closet"
 var active_bale: Dictionary = {}
 var bottom_bar: HBoxContainer
 var content: VBoxContainer
+var main_scroll: ScrollContainer
+var magic_laundry_button: Button
 var coin_label: Label
 var display_font: Font
 var bale_name_label: Label
@@ -97,6 +99,7 @@ var banner_ad_loaded := false
 var interstitial_elapsed := 0.0
 var interstitial_ad_loaded := false
 var interstitial_ad_load_requested := false
+var interstitial_retry_timer := 0.0
 var interstitial_show_pending := false
 var rewarded_ad_loaded := false
 var rewarded_ad_load_requested := false
@@ -205,16 +208,16 @@ func _build_shell() -> void:
 	coin_label.add_theme_color_override("font_color", Color("#f4d45c"))
 	top.add_child(coin_label)
 	_update_coins()
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(scroll)
+	main_scroll = ScrollContainer.new()
+	main_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(main_scroll)
 	var margins := MarginContainer.new()
 	margins.add_theme_constant_override("margin_left", 16)
 	margins.add_theme_constant_override("margin_right", 16)
 	margins.add_theme_constant_override("margin_top", 14)
 	margins.add_theme_constant_override("margin_bottom", 14)
 	margins.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(margins)
+	main_scroll.add_child(margins)
 	content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 14)
@@ -282,7 +285,8 @@ func _on_consent_info_updated() -> void:
 	_refresh_reward_ad_ui()
 
 func _on_consent_form_loaded() -> void:
-	admob.call("show_consent_form")
+	if ads_enabled and OS.has_feature("android") and is_instance_valid(admob):
+		admob.call("show_consent_form")
 
 func _on_consent_form_dismissed(_error: Variant) -> void:
 	ads_consent_ready = false
@@ -309,6 +313,11 @@ func _load_mobile_ads() -> void:
 	if not rewarded_ad_loaded and not rewarded_ad_load_requested:
 		rewarded_ad_load_requested = true
 		admob.call("load_rewarded_ad")
+	_load_interstitial_ad()
+
+func _load_interstitial_ad() -> void:
+	if not ads_enabled or not ads_consent_ready or not is_instance_valid(admob):
+		return
 	if not interstitial_ad_loaded and not interstitial_ad_load_requested:
 		interstitial_ad_load_requested = true
 		admob.call("load_interstitial_ad")
@@ -320,13 +329,12 @@ func _can_offer_rewarded_ads() -> bool:
 
 func _refresh_reward_ad_ui() -> void:
 	var available := _can_offer_rewarded_ads()
-	if not available:
-		if is_instance_valid(register_ad_button):
-			register_ad_button.visible = false
-		if is_instance_valid(designer_ad_button):
-			designer_ad_button.visible = false
-	if current_screen == "studio" and selected_item_id == "" and is_instance_valid(content):
-		_show_screen("studio")
+	if is_instance_valid(register_ad_button) and not available:
+		register_ad_button.visible = false
+	if is_instance_valid(designer_ad_button) and not available:
+		designer_ad_button.visible = false
+	if is_instance_valid(magic_laundry_button):
+		magic_laundry_button.visible = available
 
 func _restore_reward_offer(slot: String) -> void:
 	if not _can_offer_rewarded_ads():
@@ -352,6 +360,7 @@ func _on_banner_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 
 func _on_interstitial_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	interstitial_ad_load_requested = false
+	interstitial_retry_timer = 0.0
 	if not ads_enabled or not ads_consent_ready:
 		admob.call("remove_interstitial_ad", ad_info.call("get_ad_id"))
 		interstitial_ad_loaded = false
@@ -366,6 +375,7 @@ func _on_interstitial_ad_failed_to_load(_ad_info: Variant, _error: Variant) -> v
 	interstitial_ad_load_requested = false
 	interstitial_ad_loaded = false
 	interstitial_show_pending = false
+	interstitial_retry_timer = 30.0
 
 func _on_interstitial_ad_dismissed(_ad_info: Variant) -> void:
 	interstitial_ad_loaded = false
@@ -566,6 +576,11 @@ func _sell_random_listings(amount: int) -> void:
 	_show_reward_notice("Golden Register · %d sold · +%d coins" % [sold,earned])
 
 func _show_screen(screen: String) -> void:
+	if current_screen == "studio" and screen != "studio" and screen != "gallery":
+		selected_item_id = ""
+		studio_mode = "menu"
+		process_value = 0.0
+		timing_bar = null
 	if screen == "gallery" and current_screen != "gallery":
 		gallery_return_screen = current_screen
 	current_screen = screen
@@ -959,10 +974,10 @@ func _open_inventory_item(id: String) -> void:
 func _build_studio() -> void:
 	_heading("Processing Studio", "Choose an item and prepare it for the marketplace.")
 	if selected_item_id == "":
-		if _can_offer_rewarded_ads():
-			var laundry := _action_button("Magic Laundry · repair every item with a rewarded ad", false)
-			laundry.pressed.connect(_request_reward.bind("magic_laundry"))
-			content.add_child(laundry)
+		magic_laundry_button = _action_button("Magic Laundry · repair every item with a rewarded ad", false)
+		magic_laundry_button.visible = _can_offer_rewarded_ads()
+		magic_laundry_button.pressed.connect(_request_reward.bind("magic_laundry"))
+		content.add_child(magic_laundry_button)
 		var gallery := _action_button("Designer Collection · 60 pieces", false)
 		gallery.pressed.connect(_show_screen.bind("gallery"))
 		content.add_child(gallery)
@@ -1217,6 +1232,10 @@ func _process(delta: float) -> void:
 		reward_notice_timer = maxf(0.0,reward_notice_timer-delta)
 		if reward_notice_timer == 0.0:
 			reward_notice.visible = false
+	if OS.has_feature("android") and ads_enabled and ads_consent_ready and interstitial_retry_timer > 0.0:
+		interstitial_retry_timer = maxf(0.0, interstitial_retry_timer - delta)
+		if interstitial_retry_timer == 0.0:
+			_load_interstitial_ad()
 	if _can_offer_rewarded_ads() and pending_reward_slot == "":
 		register_elapsed += delta
 		designer_elapsed += delta
@@ -1253,7 +1272,7 @@ func _process(delta: float) -> void:
 		if market_timer >= 2.5:
 			market_timer = 0.0
 			_tick_market()
-	if studio_mode != "wash" and studio_mode != "iron":
+	if current_screen != "studio" or (studio_mode != "wash" and studio_mode != "iron"):
 		return
 	process_value += process_direction * delta * (2.2 if studio_mode == "wash" else 1.4)
 	if process_value >= 1.0:
@@ -1570,6 +1589,15 @@ func _unlist_item(id: String) -> void:
 			_show_reward_notice("Listing pulled · %s returned to Closet" % returned_name)
 			return
 
+func _refresh_market_screen() -> void:
+	var previous_scroll := main_scroll.scroll_vertical if is_instance_valid(main_scroll) else 0
+	_show_screen("market")
+	call_deferred("_restore_market_scroll", previous_scroll)
+
+func _restore_market_scroll(value: int) -> void:
+	if is_instance_valid(main_scroll):
+		main_scroll.scroll_vertical = value
+
 func _tick_market() -> void:
 	if listings.is_empty():
 		return
@@ -1598,8 +1626,8 @@ func _tick_market() -> void:
 		reputation = maxf(0.5,reputation - boost * 0.01)
 		_update_coins()
 	_save_game()
-	if current_screen == "market" and pending_market_item_id == "":
-		_show_screen("market")
+	if sold_count > 0 and current_screen == "market" and pending_market_item_id == "":
+		_refresh_market_screen()
 	if sold_count > 0:
 		_show_reward_notice("Market sale · %d item%s · +%d coins" % [sold_count,"" if sold_count == 1 else "s",earned])
 
@@ -1760,17 +1788,21 @@ func _set_ads_enabled(enabled: bool) -> void:
 		banner_ad_loaded = false
 		interstitial_ad_loaded = false
 		interstitial_ad_load_requested = false
+		interstitial_retry_timer = 0.0
 		rewarded_ad_loaded = false
 		rewarded_ad_load_requested = false
 		if is_instance_valid(register_ad_button):
 			register_ad_button.visible = false
 		if is_instance_valid(designer_ad_button):
 			designer_ad_button.visible = false
-		if admob != null and OS.has_feature("android"):
-			admob.call("hide_banner_ad")
-			admob.call("remove_banner_ad")
-			admob.call("remove_interstitial_ad")
-			admob.call("remove_rewarded_ad")
+		if is_instance_valid(admob) and OS.has_feature("android"):
+			if bool(admob.call("is_banner_ad_loaded")):
+				admob.call("hide_banner_ad")
+				admob.call("remove_banner_ad")
+			if bool(admob.call("is_interstitial_ad_loaded")):
+				admob.call("remove_interstitial_ad")
+			if bool(admob.call("is_rewarded_ad_loaded")):
+				admob.call("remove_rewarded_ad")
 	_save_game()
 	_refresh_reward_ad_ui()
 

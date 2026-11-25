@@ -3,48 +3,45 @@
 Last updated: 2026-11-25
 
 ## Scope
-Rebuild the existing RAG2RICH game as a native Godot 4 Android application. Preserve at least 90% of the original presentation, assets, navigation, gameplay and economy. The existing web project is not being overwritten.
 
-## Source audit completed
-- Root stack: React 18 + TypeScript + Vite + Zustand + Firebase + Capacitor.
-- Original screens: Unbox/Dashboard, Closet/Inventory, Processing Studio, Marketplace, Shop.
-- Navigation: five bottom tabs.
-- Core item categories: 15 clothing types; item image variants are loaded from src/assets/items/*.jpg.
-- Designer collection: 50 designer items; images loaded from src/assets/designer/*.jpg.
-- Bale types: Mixed (120 coins), Vintage (480), Premium (1500), each 15kg.
-- Starting wallet: 350 coins.
-- Storage tiers: Closet (15), Room (30), Garage (100), Container (200).
-- Equipment: Washing Machine, Steam Iron, Studio Lights.
-- Market includes listing fees, pricing, sale ticks, reputation, webshop unlock and free-upload gifts.
-- Ads in original: banner, interstitial and rewarded; rewarded flow includes Magic Laundry.
-- Original visual system: dark purple/charcoal surfaces, neon purple primary, cyan accent, gold designer tier, Inter + Space Grotesk typography, rounded glass-like cards and glow effects.
+Rebuild the existing RAG2RICH game as a native Godot 4 Android application. Preserve at least 90% of the original presentation, assets, navigation, gameplay and economy. The existing web project remains untouched.
 
 ## Port status by module
-Percentages reflect actual ported work, not source-audit coverage.
+
+Percentages estimate the portion of each module implemented in Godot. Audit work and imported files alone do not count as implemented gameplay. A runnable scaffold is not a completed screen.
 
 | Module | Completion | Evidence / remaining |
 |---|---:|---|
-| Original source and asset audit | 25% | Main screen flow, design tokens, core data models and asset import paths inspected; full asset manifest and all component states still need inventory. |
-| Godot project foundation | 15% | Project config, main scene, navigation shell and first-pass unbox/closet scaffold committed; not yet run in Godot. |
-| Original visual recreation | 2% | Color tokens and layout intent mapped; original image/font files not yet imported. |
-| Bale / item gameplay | 5% | Basic purchase/reveal scaffold; original weighted rarity, click-to-reveal progression, weight handling and designer drops not ported. |
-| Inventory and studio processing | 0% | Not ported. |
-| Marketplace and economy | 0% | Not ported. |
-| Upgrades and webshop | 0% | Not ported. |
-| Save / cloud / offline progression | 0% | Not ported. |
-| AdMob and GDPR/UMP | 0% | Not ported; plugin and consent integration still to be selected and implemented. |
-| Android build, optimization and release tests | 0% | No APK/AAB built or device-tested. |
+| Original source and asset audit | 45% | Main screens, models, asset paths and bale/item rules inspected. Detailed processing, market, storage/equipment and ad states still need a complete audit. |
+| Godot project foundation | 35% | Godot 4 project, portrait configuration, main scene, five-tab shell and bale/closet scaffold. Headless project launch succeeds; Android export/device validation remains. |
+| Original visual recreation | 15% | Original bale art, all 26 item images and 55 designer images are copied into the Godot project. Bale and item-variant images are wired into UI. Original fonts, full screen styling and designer collection presentation remain. |
+| Bale / item gameplay | 25% | Bale prices, starting coins, 15 item templates, rarity-weighted selection, repeated tap reveal, item weights, conditions and item variants implemented. Designer drops, full state handling and fidelity validation remain. |
+| Inventory and studio processing | 5% | Closet list displays item name, condition and original item image. Capacity is tracked. Item selection/details, processing mini-games, photo backdrops and repair rewards are not ported. |
+| Marketplace and economy | 0% | Listings, upload fees, market ticks, sale probability, reputation, gifts and webshop flow not ported. |
+| Upgrades and webshop | 10% | Storage tier names, prices and capacities are represented; buying a storage tier changes the local capacity. Equipment levels, webshop unlock and full upgrade rules remain. |
+| Save / cloud / offline progression | 0% | No local save, cloud sync or offline market progression in Godot. |
+| AdMob and GDPR/UMP | 0% | No Godot ad SDK, consent flow or Android privacy integration. |
+| Android build, optimization and release tests | 3% | Godot 4.7.2 headless asset import and project launch succeeded. No APK/AAB export, Android device test, performance pass or release check. |
 
-Overall implementation estimate: **3%** (early scaffolding only; not a playable port).
+**Overall implementation estimate: 14%.** This is a weighted estimate across modules; the five-tab scaffold is runnable, but the port is not yet a playable replica.
 
-## Immediate next steps
-1. Obtain and import the original item/designer/background/font assets without substitution.
-2. Complete source audit of all screens, dialogs, mini-games, progression and balancing.
-3. Recreate the original visual system and screen geometry in Godot.
-4. Port the complete Zustand game state and rules.
-5. Port persistence, cloud sync and offline-safe market progression.
-6. Integrate AdMob with test ad units and EEA consent flow.
-7. Build, install and test Android APK/AAB on a real device.
+## Assets
+
+The Android project includes the original bale image, 26 clothing images and 55 designer images from the web project. No substitute assets were created or introduced. Five designer data IDs have no matching image filename in the source asset folder; the original web game uses its emoji fallback for those items.
 
 ## Verification
-No Godot editor/runtime validation, Android export, real-device test, or ad request has been performed yet.
+
+- Godot 4.7.2 headless import processed the imported image assets.
+- Godot 4.7.2 headless project launch exited successfully without script parse or image-loading errors.
+- No Android APK/AAB export or real-device test has been performed.
+
+## Next steps
+
+1. Finish the source audit for screen states, processing mini-games, marketplace balance and progression.
+2. Port inventory selection and full Studio processing.
+3. Port marketplace listings, sales, reputation and free-upload events.
+4. Port equipment, webshop and complete storage upgrade rules.
+5. Add local persistence and evaluate cloud/offline behavior for a standalone Android build.
+6. Integrate Android ads and the EEA consent flow.
+7. Recreate typography, remaining visual details and designer collection UI using only original assets.
+8. Export and test APK/AAB on Android hardware.

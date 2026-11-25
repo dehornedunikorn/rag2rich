@@ -12,36 +12,33 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 
 | Module | Completion | Evidence / remaining |
 |---|---:|---|
-| Original source and asset audit | 45% | Main screens, models, asset paths and bale/item rules inspected. Detailed processing, market, storage/equipment and ad states still need a complete audit. |
-| Godot project foundation | 35% | Godot 4 project, portrait configuration, main scene, five-tab shell and bale/closet scaffold. Headless project launch succeeds; Android export/device validation remains. |
-| Original visual recreation | 15% | Original bale art, all 26 item images and 55 designer images are copied into the Godot project. Bale and item-variant images are wired into UI. Original fonts, full screen styling and designer collection presentation remain. |
-| Bale / item gameplay | 25% | Bale prices, starting coins, 15 item templates, rarity-weighted selection, repeated tap reveal, item weights, conditions and item variants implemented. Designer drops, full state handling and fidelity validation remain. |
-| Inventory and studio processing | 35% | Closet item selection, item status, original item image, wash/iron timing games, photo backdrops/lighting and condition/quality updates are implemented. Processing controls are not yet visually validated on a device; item gallery and reward ad flow remain. |
-| Marketplace and economy | 0% | Listings, upload fees, market ticks, sale probability, reputation, gifts and webshop flow not ported. |
-| Upgrades and webshop | 20% | Storage purchases and three equipment upgrade tracks are implemented with original prices/bonuses; washer, iron and lighting upgrades affect Studio outcomes. Webshop unlock and full progression remain. |
-| Save / cloud / offline progression | 0% | No local save, cloud sync or offline market progression in Godot. |
+| Original source and asset audit | 75% | Bale/item rules, Studio minigames, marketplace probability, gifts, webshop, storage, upgrades and designer rewards have been checked against the source. Ads, GDPR/UMP and several peripheral flows remain. |
+| Godot project foundation | 45% | Godot 4 portrait project, themed five-tab shell, content margins, screen routing, save/load foundation and pause/close saves. Android export/device validation remains. |
+| Original visual recreation | 40% | Original bale art, all 26 item images and 55 designer images are in the project. Bale/item images, styled cards, progress bars and a 60-piece locked/unlocked designer gallery are wired into screens. Typography and visual-device review remain. |
+| Bale / item gameplay | 35% | Bale prices, starting coins, 15 item templates, rarity-weighted selection, repeated tap reveal, bale/reveal progress, item weights, conditions, item variants, close and save state are implemented. Designer drops, full state handling and fidelity validation remain. |
+| Inventory and studio processing | 50% | Closet capacity, item selection into Studio, item status, original item images, wash/iron timing games, photo backdrops/lighting, condition/quality updates and persistent designer collection state are implemented. Rewarded-ad trigger/flow and device visual validation remain. |
+| Marketplace and economy | 70% | Listing flow and fee, fair-price suggestion, market ticks, sale probability, reputation, five-upload gifts and pull/unlist behavior are implemented. Edge-case/economy review and device UI validation remain. |
+| Upgrades and webshop | 45% | Storage purchases and three equipment upgrade tracks use source prices/bonuses. Webshop unlock now uses the source cost, reputation threshold, fee waiver and sale speed bonus. Full progression integration remains. |
+| Save / cloud / offline progression | 75% | Local ConfigFile save/load covers coins, inventory, active bale, listings, sales/reputation, upgrades, storage, free uploads, webshop and discovered designers. Cloud sync and offline market progression remain out of scope for this standalone pass. |
 | AdMob and GDPR/UMP | 0% | No Godot ad SDK, consent flow or Android privacy integration. |
 | Android build, optimization and release tests | 3% | Godot 4.7.2 headless asset import and project launch succeeded. No APK/AAB export, Android device test, performance pass or release check. |
 
-**Overall implementation estimate: 18%.** This is a weighted estimate across modules; the five-tab scaffold is runnable, but the port is not yet a playable replica.
+**Overall implementation estimate: 44%.** This is an equal-weight estimate across the listed modules. The Android port is playable through bale opening, Studio processing, marketplace sales and upgrades, but ads/consent, complete fidelity and Android release validation are still missing.
 
 ## Assets
 
-The Android project includes the original bale image, 26 clothing images and 55 designer images from the web project. No substitute assets were created or introduced. Five designer data IDs have no matching image filename in the source asset folder; the original web game uses its emoji fallback for those items.
+The Android project includes the original bale image, 26 clothing images, 55 designer images and a 60-item designer catalog exported from the web project. No substitute assets were created or introduced. Five designer data IDs have no matching image filename in the source asset folder; the Godot catalog uses their original emoji fallback.
 
 ## Verification
 
-- Godot 4.7.2 headless import processed the imported image assets.
-- Godot 4.7.2 headless project launch exited successfully without script parse or image-loading errors after the Studio and equipment changes.
+- Godot 4.7.2 headless project launch loaded `main.gd` and ran without script parse or runtime errors after marketplace, persistence and catalog changes.
 - No Android APK/AAB export or real-device test has been performed.
 
 ## Next steps
 
-1. Finish the source audit for screen states, processing mini-games, marketplace balance and progression.
-2. Port inventory selection and full Studio processing.
-3. Port marketplace listings, sales, reputation and free-upload events.
-4. Port equipment, webshop and complete storage upgrade rules.
-5. Add local persistence and evaluate cloud/offline behavior for a standalone Android build.
-6. Integrate Android ads and the EEA consent flow.
-7. Recreate typography, remaining visual details and designer collection UI using only original assets.
-8. Export and test APK/AAB on Android hardware.
+1. Integrate rewarded-ad triggers with the designer-item award and listing-sale rewards.
+2. Finish inventory and Studio polish, including the Magic Laundry flow.
+3. Audit and tune bale, storage and marketplace progression together.
+4. Recreate typography and remaining visual details using only original assets.
+5. Integrate Android ads and the EEA consent flow.
+6. Export and test APK/AAB on Android hardware.

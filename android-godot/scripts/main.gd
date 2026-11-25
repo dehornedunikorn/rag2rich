@@ -33,6 +33,15 @@ const STORAGE_COST := {"closet":0,"room":5000,"garage":12000,"container":25000}
 var current_screen := "dashboard"
 var coins := 350
 var inventory: Array[Dictionary] = []
+var listings: Array[Dictionary] = []
+var total_sales := 0
+var reputation := 1.0
+var free_uploads := 0
+var market_timer := 0.0
+var gift_timer := 0.0
+var gift_open := false
+var webshop_unlocked := false
+var pending_market_item_id := ""
 var storage_tier := "closet"
 var active_bale: Dictionary = {}
 var bottom_bar: HBoxContainer
@@ -40,15 +49,23 @@ var content: VBoxContainer
 var coin_label: Label
 var bale_texture: Texture2D
 var item_textures: Dictionary = {}
+var designer_items: Array[Dictionary] = []
+var designer_textures: Dictionary = {}
+var discovered_designers: Array[String] = []
 var upgrade_levels := {"washer":0,"iron":0,"lights":0}
 var selected_item_id := ""
+var selected_designer_id := ""
 var studio_mode := "menu"
 var process_value := 0.0
 var process_direction := 1.0
 var timing_bar: ProgressBar
 var light_slider: HSlider
+var selected_lighting := 50.0
 
 func _ready() -> void:
+	_load_game()
+	_load_designer_catalog()
+	theme = _create_game_theme()
 	bale_texture = load("res://assets/bale.png")
 	for kind in ["tshirt","shirt","jeans","dress","jacket","coat","hoodie","sneakers","bag","scarf","blazer","skirt","cap","boots","suit"]:
 		var textures: Array[Texture2D] = []
@@ -57,6 +74,47 @@ func _ready() -> void:
 		item_textures[kind] = textures
 	_build_shell()
 	_show_screen("dashboard")
+
+func _create_game_theme() -> Theme:
+	var game_theme := Theme.new()
+	game_theme.default_font_size = 15
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = PANEL
+	normal.border_color = Color("#393144")
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(12)
+	normal.content_margin_left = 12
+	normal.content_margin_right = 12
+	normal.content_margin_top = 8
+	normal.content_margin_bottom = 8
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("#292337")
+	hover.border_color = PURPLE
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = Color("#382544")
+	var disabled := normal.duplicate() as StyleBoxFlat
+	disabled.bg_color = Color("#17141f")
+	disabled.border_color = Color("#292532")
+	game_theme.set_stylebox("normal", "Button", normal)
+	game_theme.set_stylebox("hover", "Button", hover)
+	game_theme.set_stylebox("pressed", "Button", pressed)
+	game_theme.set_stylebox("disabled", "Button", disabled)
+	game_theme.set_color("font_color", "Button", Color("#f5effb"))
+	game_theme.set_color("font_hover_color", "Button", Color.WHITE)
+	game_theme.set_color("font_disabled_color", "Button", MUTED)
+	var progress_track := StyleBoxFlat.new()
+	progress_track.bg_color = Color("#2a2534")
+	progress_track.set_corner_radius_all(8)
+	var progress_fill := StyleBoxFlat.new()
+	progress_fill.bg_color = PURPLE
+	progress_fill.set_corner_radius_all(8)
+	game_theme.set_stylebox("background", "ProgressBar", progress_track)
+	game_theme.set_stylebox("fill", "ProgressBar", progress_fill)
+	return game_theme
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		_save_game()
 
 func _build_shell() -> void:
 	var root := VBoxContainer.new()
@@ -80,10 +138,17 @@ func _build_shell() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(scroll)
+	var margins := MarginContainer.new()
+	margins.add_theme_constant_override("margin_left", 16)
+	margins.add_theme_constant_override("margin_right", 16)
+	margins.add_theme_constant_override("margin_top", 14)
+	margins.add_theme_constant_override("margin_bottom", 14)
+	margins.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(margins)
 	content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 14)
-	scroll.add_child(content)
+	margins.add_child(content)
 	bottom_bar = HBoxContainer.new()
 	bottom_bar.custom_minimum_size.y = 78
 	bottom_bar.add_theme_constant_override("separation", 4)
@@ -104,11 +169,14 @@ func _show_screen(screen: String) -> void:
 		"dashboard": _build_dashboard()
 		"inventory": _build_inventory()
 		"studio": _build_studio()
-		"market": _build_placeholder("Marketplace","Your prepared listings and sales will appear here.")
+		"gallery": _build_gallery()
+		"designer_detail": _build_designer_detail()
+		"market": _build_market()
 		"shop": _build_shop()
 	for i in bottom_bar.get_child_count():
 		var b := bottom_bar.get_child(i) as Button
-		b.modulate = PURPLE if ["dashboard","inventory","studio","market","shop"][i] == screen else MUTED
+		var selected_screen := "studio" if screen == "gallery" else screen
+		b.modulate = PURPLE if ["dashboard","inventory","studio","market","shop"][i] == selected_screen else MUTED
 
 func _heading(title: String, subtitle: String) -> void:
 	var h := Label.new()
@@ -124,6 +192,14 @@ func _heading(title: String, subtitle: String) -> void:
 func _build_dashboard() -> void:
 	if not active_bale.is_empty():
 		_heading(str(active_bale.def.name), "%.2f / %.0f kg left · tap to reveal" % [active_bale.remaining, active_bale.def.weight])
+		var close_bale := _action_button("Put bale away", false)
+		close_bale.pressed.connect(_close_bale)
+		content.add_child(close_bale)
+		var bale_progress := ProgressBar.new()
+		bale_progress.max_value = float(active_bale.def.weight)
+		bale_progress.value = float(active_bale.def.weight) - float(active_bale.remaining)
+		bale_progress.custom_minimum_size.y = 18
+		content.add_child(bale_progress)
 		if _occupied() >= _capacity():
 			_build_placeholder("Storage full","Sell items or upgrade storage before unpacking more.")
 			return
@@ -143,6 +219,13 @@ func _build_dashboard() -> void:
 		label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		bale.add_child(label)
 		content.add_child(bale)
+		if not active_bale.current.is_empty():
+			var current: Dictionary = active_bale.current
+			var reveal_progress := ProgressBar.new()
+			reveal_progress.max_value = float(current.total_clicks)
+			reveal_progress.value = float(current.total_clicks) - float(current.clicks_left)
+			reveal_progress.custom_minimum_size.y = 18
+			content.add_child(reveal_progress)
 		return
 	_heading("Buy a Bale","Pick a mystery bundle and start unboxing.")
 	_build_placeholder("Storage: %d / %d slots" % [_occupied(),_capacity()],"Inventory and marketplace listings both use storage.")
@@ -160,7 +243,13 @@ func _buy_bale(bale: Dictionary) -> void:
 		return
 	coins -= int(bale.cost)
 	active_bale = {"def":bale.duplicate(),"remaining":float(bale.weight),"current":{}}
+	_save_game()
 	_update_coins()
+	_show_screen("dashboard")
+
+func _close_bale() -> void:
+	active_bale.clear()
+	_save_game()
 	_show_screen("dashboard")
 
 func _weighted_item(boost: float) -> Dictionary:
@@ -185,6 +274,7 @@ func _click_bale() -> void:
 	if active_bale.current.is_empty():
 		if active_bale.remaining <= 0.05:
 			active_bale.clear()
+			_save_game()
 			_show_screen("dashboard")
 			return
 		var template := _weighted_item(float(active_bale.def.boost))
@@ -199,6 +289,7 @@ func _click_bale() -> void:
 	current.clicks_left -= 1
 	if current.clicks_left > 0:
 		active_bale.current = current
+		_save_game()
 		_show_screen("dashboard")
 		return
 	var t: Dictionary = current.template
@@ -215,6 +306,7 @@ func _click_bale() -> void:
 	active_bale.current = {}
 	if active_bale.remaining <= 0.05:
 		active_bale.clear()
+	_save_game()
 	_show_screen("dashboard")
 
 func _variant_count(kind: String) -> int:
@@ -224,10 +316,18 @@ func _capacity() -> int:
 	return int(STORAGE_CAPACITY[storage_tier])
 
 func _occupied() -> int:
-	return inventory.size()
+	return inventory.size() + listings.size()
 
 func _build_inventory() -> void:
-	_heading("Your Closet","%d items in your closet" % inventory.size())
+	_heading("Your Closet","%d / %d slots · %d items in the closet" % [_occupied(),_capacity(),inventory.size()])
+	var capacity_bar := ProgressBar.new()
+	capacity_bar.max_value = _capacity()
+	capacity_bar.value = _occupied()
+	capacity_bar.custom_minimum_size.y = 18
+	content.add_child(capacity_bar)
+	var gallery := _action_button("Designer Collection", false)
+	gallery.pressed.connect(_show_screen.bind("gallery"))
+	content.add_child(gallery)
 	if inventory.is_empty():
 		_build_placeholder("🧺 Closet empty","Buy a bale and start unboxing.")
 		return
@@ -235,16 +335,25 @@ func _build_inventory() -> void:
 		var card := Button.new()
 		card.custom_minimum_size.y = 84
 		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		card.text = "%s  %s  ·  Condition %d%%" % [item.emoji,item.name,int(item.condition)]
+		card.text = "%s  %s  ·  %s · Condition %d%%" % [item.emoji,item.name,str(item.rarity).capitalize(),int(item.condition)]
 		var texture := _item_texture(item)
 		if texture:
 			card.icon = texture
 			card.expand_icon = true
+		card.pressed.connect(_open_inventory_item.bind(str(item.id)))
 		content.add_child(card)
+
+func _open_inventory_item(id: String) -> void:
+	selected_item_id = id
+	studio_mode = "menu"
+	_show_screen("studio")
 
 func _build_studio() -> void:
 	_heading("Processing Studio", "Choose an item and prepare it for the marketplace.")
 	if selected_item_id == "":
+		var gallery := _action_button("Designer Collection · 60 pieces", false)
+		gallery.pressed.connect(_show_screen.bind("gallery"))
+		content.add_child(gallery)
 		for item in inventory:
 			var button := Button.new()
 			button.text = "%s %s · %d%% · %s" % [item.emoji,item.name,int(item.condition),"Ready" if item.washed and item.ironed and item.photographed else "In progress"]
@@ -287,9 +396,98 @@ func _build_studio() -> void:
 		var photo := _action_button("Photo", item.photographed or studio_mode != "menu")
 		photo.pressed.connect(_start_studio_mode.bind("photo"))
 		content.add_child(photo)
+		var list_button := _action_button("List on Marketplace", false)
+		list_button.pressed.connect(_prepare_listing.bind(str(item.id)))
+		content.add_child(list_button)
 	var back := _action_button("Back to items", false)
 	back.pressed.connect(_clear_studio_selection)
 	content.add_child(back)
+
+func _load_designer_catalog() -> void:
+	var file := FileAccess.open("res://data/designers.json", FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	if parsed is not Array:
+		return
+	for row in parsed:
+		if row is Dictionary:
+			designer_items.append(row)
+			var image_path := "res://assets/designer/" + str(row.id) + ".jpg"
+			if FileAccess.file_exists(image_path):
+				designer_textures[str(row.id)] = load(image_path)
+
+func _build_gallery() -> void:
+	_heading("Studio Gallery", "%d / %d designer pieces discovered" % [discovered_designers.size(),designer_items.size()])
+	var back := _action_button("Back to Studio", false)
+	back.pressed.connect(_show_screen.bind("studio"))
+	content.add_child(back)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	content.add_child(grid)
+	for designer in designer_items:
+		var owned := discovered_designers.has(str(designer.id))
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(104,112)
+		card.text = "%s\n%s" % [str(designer.emoji) if owned else "🔒",str(designer.name) if owned else "Undiscovered"]
+		card.disabled = not owned
+		if owned and designer_textures.has(str(designer.id)):
+			card.icon = designer_textures[str(designer.id)]
+			card.expand_icon = true
+		card.pressed.connect(_open_designer_detail.bind(str(designer.id)))
+		grid.add_child(card)
+
+func _open_designer_detail(id: String) -> void:
+	selected_designer_id = id
+	_show_screen("designer_detail")
+
+func _build_designer_detail() -> void:
+	var selected: Dictionary = {}
+	for designer in designer_items:
+		if str(designer.id) == selected_designer_id:
+			selected = designer
+			break
+	if selected.is_empty() or not discovered_designers.has(selected_designer_id):
+		selected_designer_id = ""
+		_show_screen("gallery")
+		return
+	_heading(str(selected.name), "Designer piece · %d coins" % int(selected.base_value))
+	var texture: Texture2D = designer_textures.get(selected_designer_id)
+	if texture:
+		var portrait := TextureRect.new()
+		portrait.custom_minimum_size = Vector2(0,340)
+		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		portrait.texture = texture
+		content.add_child(portrait)
+	else:
+		_build_placeholder(str(selected.emoji), "Original fallback art")
+	_build_placeholder("Designer item", str(selected.description))
+	var back := _action_button("Back to Gallery", false)
+	back.pressed.connect(func():
+		selected_designer_id = ""
+		_show_screen("gallery")
+	)
+	content.add_child(back)
+
+func _award_random_designer() -> Dictionary:
+	if designer_items.is_empty() or _occupied() >= _capacity():
+		return {}
+	var designer: Dictionary = designer_items[randi_range(0,designer_items.size()-1)]
+	var item := {
+		"id":str(Time.get_unix_time_from_system())+"-"+str(randi()),
+		"kind":"jacket","designer_id":str(designer.id),"name":str(designer.name),"emoji":str(designer.emoji),
+		"weight":float(designer.weight),"base_value":int(designer.base_value),"rarity":"designer",
+		"condition":randf_range(70.0,95.0),"photo_quality":0.0,
+		"washed":false,"ironed":false,"photographed":false
+	}
+	inventory.append(item)
+	if not discovered_designers.has(str(designer.id)):
+		discovered_designers.append(str(designer.id))
+	_save_game()
+	return item
 
 func _action_button(label: String, disabled: bool) -> Button:
 	var button := Button.new()
@@ -321,6 +519,17 @@ func _start_studio_mode(mode: String) -> void:
 	_show_screen("studio")
 
 func _process(delta: float) -> void:
+	if current_screen == "market":
+		market_timer += delta
+		gift_timer += delta
+		if gift_timer >= 10.0:
+			gift_timer = 0.0
+			if randf() < 0.05:
+				gift_open = true
+				_show_screen("market")
+		if market_timer >= 2.5:
+			market_timer = 0.0
+			_tick_market()
 	if studio_mode != "wash" and studio_mode != "iron":
 		return
 	process_value += process_direction * delta * (2.2 if studio_mode == "wash" else 1.4)
@@ -330,6 +539,8 @@ func _process(delta: float) -> void:
 	elif process_value <= 0.0:
 		process_value = 0.0
 		process_direction = 1.0
+	if is_instance_valid(timing_bar):
+		timing_bar.value = process_value * 100.0
 
 func _build_timing_game(title: String, center: float, half_zone: float, speed: float) -> void:
 	var guidance := Label.new()
@@ -360,6 +571,7 @@ func _finish_timing_game(center: float, half_zone: float) -> void:
 		var gain := -12.0 if burned else (maxf(12.0,35.0-absf(process_value-center)*240.0)+_upgrade_bonus("iron") if in_zone else 1.0)
 		item.condition = clampf(float(item.condition)+gain,0.0,100.0)
 		item.ironed = true
+	_save_game()
 	studio_mode = "menu"
 	_show_screen("studio")
 
@@ -375,6 +587,7 @@ func _lights_cap() -> float:
 	return [60.0,75.0,90.0,100.0][clampi(int(upgrade_levels.lights),0,3)]
 
 func _build_photo_mode(item: Dictionary) -> void:
+	selected_lighting = 50.0
 	var title := Label.new()
 	title.text = "Backdrop and lighting · cap %d%%" % int(_lights_cap())
 	content.add_child(title)
@@ -383,22 +596,209 @@ func _build_photo_mode(item: Dictionary) -> void:
 	light_slider.max_value = 100
 	light_slider.value = 50
 	light_slider.custom_minimum_size.y = 42
+	light_slider.value_changed.connect(_set_photo_lighting)
 	content.add_child(light_slider)
 	for backdrop in [{"id":"white","quality":30.0},{"id":"studio","quality":60.0},{"id":"nature","quality":80.0},{"id":"neon","quality":95.0}]:
 		var choice := _action_button("%s backdrop · estimated %d%%" % [str(backdrop.id).capitalize(),int(minf(_lights_cap(),float(backdrop.quality)*0.6+50.0*0.4))], false)
-		choice.pressed.connect(_take_photo.bind(float(backdrop.quality),float(light_slider.value),str(item.id)))
+		choice.pressed.connect(_take_photo.bind(float(backdrop.quality),str(item.id)))
 		content.add_child(choice)
 
-func _take_photo(backdrop_quality: float, lighting: float, item_id: String) -> void:
+func _set_photo_lighting(value: float) -> void:
+	selected_lighting = value
+
+func _take_photo(backdrop_quality: float, item_id: String) -> void:
 	for item in inventory:
 		if str(item.id) == item_id:
-			item.photo_quality = minf(_lights_cap(),backdrop_quality*0.6+lighting*0.4)
+			item.photo_quality = minf(_lights_cap(),backdrop_quality*0.6+selected_lighting*0.4)
 			item.photographed = true
+	_save_game()
 	studio_mode = "menu"
 	_show_screen("studio")
 
+func _build_market() -> void:
+	_heading("Marketplace", "%d active · %d sales · reputation %d%% · slots %d/%d" % [listings.size(),total_sales,int(_reputation_pct()),_occupied(),_capacity()])
+	_build_placeholder("Listing fee: %s" % ("Free" if free_uploads > 0 or webshop_unlocked else "5 coins"), "Price items from Studio. Sales resolve every 2.5 seconds.")
+	if gift_open:
+		var gift := _action_button("Claim 5 free listings", false)
+		gift.pressed.connect(_claim_market_gift)
+		content.add_child(gift)
+	else:
+		_build_placeholder("Free listings: %d" % free_uploads, "An occasional marketplace gift provides five uploads.")
+	if pending_market_item_id != "":
+		var item := _inventory_item(pending_market_item_id)
+		if not item.is_empty():
+			var price := SpinBox.new()
+			price.min_value = 1
+			price.step = 5
+			price.max_value = int(item.base_value) * 3
+			price.value = maxf(5.0,round(float(item.base_value) * (float(item.condition) / 100.0) * (0.7 + float(item.photo_quality) / 100.0 * 0.6)))
+			content.add_child(price)
+			var list := _action_button("List %s for %d coins" % [item.name,int(price.value)], false)
+			list.pressed.connect(_list_item.bind(str(item.id),price))
+			content.add_child(list)
+		var cancel := _action_button("Cancel", false)
+		cancel.pressed.connect(_cancel_pending_listing)
+		content.add_child(cancel)
+	for listing in listings:
+		var row := HBoxContainer.new()
+		var item: Dictionary = listing.item
+		var thumbnail := TextureRect.new()
+		thumbnail.custom_minimum_size = Vector2(56,56)
+		thumbnail.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		thumbnail.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		thumbnail.texture = _item_texture(item)
+		row.add_child(thumbnail)
+		var info := Label.new()
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var ratio := float(item.base_value) / maxf(1.0,float(listing.price))
+		var fairness := "Fair" if ratio > 0.85 else ("Pricey" if ratio > 0.55 else "Overpriced")
+		info.text = "%s · %d coins · %s\nCond %d%% · Photo %d%% · %d/30 ticks" % [item.name,int(listing.price),fairness,int(item.condition),int(item.photo_quality),int(listing.ticks)]
+		row.add_child(info)
+		var progress := ProgressBar.new()
+		progress.custom_minimum_size = Vector2(54,18)
+		progress.max_value = 30
+		progress.value = mini(30,int(listing.ticks))
+		row.add_child(progress)
+		var pull := _action_button("Pull", false)
+		pull.pressed.connect(_unlist_item.bind(str(listing.id)))
+		row.add_child(pull)
+		content.add_child(row)
+	if listings.is_empty():
+		_build_placeholder("No active listings", "Choose a prepared item from Studio.")
+
+func _prepare_listing(id: String) -> void:
+	if _inventory_item(id).is_empty():
+		return
+	selected_item_id = ""
+	studio_mode = "menu"
+	pending_market_item_id = id
+	_show_screen("market")
+
+func _inventory_item(id: String) -> Dictionary:
+	for item in inventory:
+		if str(item.id) == id:
+			return item
+	return {}
+
+func _list_item(id: String, price_control: SpinBox) -> void:
+	var item := _inventory_item(id)
+	if item.is_empty() or _occupied() > _capacity():
+		return
+	var use_free := free_uploads > 0
+	var fee := 0 if use_free or webshop_unlocked else 5
+	if coins < fee:
+		return
+	coins -= fee
+	if use_free:
+		free_uploads -= 1
+	listings.append({"id":str(Time.get_unix_time_from_system())+str(randi()),"item":item.duplicate(true),"price":int(price_control.value),"ticks":0})
+	inventory.erase(item)
+	_save_game()
+	pending_market_item_id = ""
+	_update_coins()
+	_show_screen("market")
+
+func _cancel_pending_listing() -> void:
+	pending_market_item_id = ""
+	_show_screen("market")
+
+func _unlist_item(id: String) -> void:
+	for listing in listings:
+		if str(listing.id) == id:
+			inventory.append(listing.item)
+			listings.erase(listing)
+			_save_game()
+			_show_screen("market")
+			return
+
+func _tick_market() -> void:
+	if listings.is_empty():
+		return
+	var remaining: Array[Dictionary] = []
+	var sold_count := 0
+	var earned := 0
+	var speed := (1.0 + total_sales * 0.001) * (1.15 if webshop_unlocked else 1.0)
+	for listing in listings:
+		listing.ticks = int(listing.ticks) + 1
+		var item: Dictionary = listing.item
+		var ratio := float(item.base_value) / maxf(1.0,float(listing.price))
+		var condition_factor := float(item.condition) / 100.0
+		var photo_factor := 0.5 + float(item.photo_quality) / 200.0
+		var chance := clampf(ratio * condition_factor * photo_factor / reputation * 0.05 * speed,0.005,0.6)
+		if randf() < chance:
+			sold_count += 1
+			earned += int(listing.price)
+		else:
+			remaining.append(listing)
+	listings = remaining
+	if sold_count > 0:
+		coins += earned
+		var old_milestone := int(total_sales / 100)
+		total_sales += sold_count
+		var boost := int(total_sales / 100) - old_milestone
+		reputation = maxf(0.5,reputation - boost * 0.01)
+		_update_coins()
+		_save_game()
+	if current_screen == "market":
+		_show_screen("market")
+
+func _claim_market_gift() -> void:
+	free_uploads += 5
+	gift_open = false
+	_save_game()
+	_show_screen("market")
+
+func _unlock_webshop() -> void:
+	if webshop_unlocked or coins < 5000 or _reputation_pct() < 30.0:
+		return
+	coins -= 5000
+	webshop_unlocked = true
+	_save_game()
+	_update_coins()
+	_show_screen(current_screen)
+
+func _reputation_pct() -> float:
+	return (1.0 - (reputation - 0.5) / 0.5) * 100.0
+
+func _save_game() -> void:
+	var save := ConfigFile.new()
+	save.set_value("game", "coins", coins)
+	save.set_value("game", "inventory", inventory)
+	save.set_value("game", "listings", listings)
+	save.set_value("game", "total_sales", total_sales)
+	save.set_value("game", "reputation", reputation)
+	save.set_value("game", "free_uploads", free_uploads)
+	save.set_value("game", "webshop_unlocked", webshop_unlocked)
+	save.set_value("game", "storage_tier", storage_tier)
+	save.set_value("game", "active_bale", active_bale)
+	save.set_value("game", "upgrade_levels", upgrade_levels)
+	save.set_value("game", "discovered_designers", discovered_designers)
+	save.save("user://savegame.cfg")
+
+func _load_game() -> void:
+	var save := ConfigFile.new()
+	if save.load("user://savegame.cfg") != OK:
+		return
+	coins = int(save.get_value("game", "coins", coins))
+	inventory.assign(save.get_value("game", "inventory", []))
+	listings.assign(save.get_value("game", "listings", []))
+	total_sales = int(save.get_value("game", "total_sales", total_sales))
+	reputation = float(save.get_value("game", "reputation", reputation))
+	free_uploads = int(save.get_value("game", "free_uploads", free_uploads))
+	webshop_unlocked = bool(save.get_value("game", "webshop_unlocked", webshop_unlocked))
+	storage_tier = str(save.get_value("game", "storage_tier", storage_tier))
+	active_bale = save.get_value("game", "active_bale", active_bale)
+	upgrade_levels = save.get_value("game", "upgrade_levels", upgrade_levels)
+	discovered_designers.assign(save.get_value("game", "discovered_designers", []))
+
 func _build_shop() -> void:
 	_heading("Shop", "Storage and equipment upgrades.")
+	if webshop_unlocked:
+		_build_placeholder("Webshop active", "Listings are free and sales resolve 15% faster.")
+	else:
+		var webshop := _action_button("Webshop · 5,000 coins · requires 30% reputation", coins < 5000 or _reputation_pct() < 30.0)
+		webshop.pressed.connect(_unlock_webshop)
+		content.add_child(webshop)
 	for tier in ["room","garage","container"]:
 		var card := _action_button("%s storage · %d slots · %d coins" % [tier.capitalize(),STORAGE_CAPACITY[tier],STORAGE_COST[tier]], coins < STORAGE_COST[tier] or _tier_rank(tier) <= _tier_rank(storage_tier))
 		card.pressed.connect(_buy_storage.bind(tier))
@@ -422,6 +822,7 @@ func _buy_equipment(key: String, cost: int) -> void:
 		return
 	coins -= cost
 	upgrade_levels[key] = int(upgrade_levels[key])+1
+	_save_game()
 	_update_coins()
 	_show_screen("shop")
 
@@ -430,6 +831,7 @@ func _buy_storage(tier: String) -> void:
 		return
 	coins -= STORAGE_COST[tier]
 	storage_tier = tier
+	_save_game()
 	_update_coins()
 	_show_screen("shop")
 
@@ -445,6 +847,8 @@ func _variant_files(kind: String) -> Array[String]:
 	return result
 
 func _item_texture(item: Dictionary) -> Texture2D:
+	if item.has("designer_id"):
+		return designer_textures.get(str(item.designer_id))
 	var kind := str(item.kind)
 	var textures: Array = item_textures.get(kind, [])
 	if textures.is_empty():

@@ -21,9 +21,9 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 | Upgrades and webshop | 100% | All four storage capacities/costs and sequential purchase rules, three equipment tracks with every source level/price/effect, webshop price/reputation gate/benefits, and confirmed full reset match the source. Android playtest is tracked separately under build/release. |
 | Save / cloud / offline progression | 85% | Versioned local ConfigFile saves cover game state and listing ticks; save loads validate values and recover from a backup file. Cloud sync and offline market progression remain unimplemented. |
 | AdMob and GDPR/UMP | 85% | Godot AdMob v7 is integrated with test IDs by default, startup and user-accessible Shop-screen UMP consent, banner and rewarded ads, all three reward actions, and source-matched 10-minute interstitials. Android/device ad validation remains. |
-| Android build, optimization and release tests | 20% | A GitHub Actions workflow now provisions Godot 4.7.2, Java 17 and Android API 36, then exports an unsigned debug APK artifact; the preset uses min API 24 and ARM64. The export is still being resolved through CI, and Android device test, performance pass and release signing remain. |
+| Android build, optimization and release tests | 40% | GitHub Actions successfully exported a Godot 4.7.2 Android debug APK with Java 17, API 36, min API 24 and ARM64. The `rag2rich-debug-apk` artifact is available from the [successful Actions run](https://github.com/dehornedunikorn/rag2rich/actions/runs/45601733188) for 14 days. Android installation/runtime test, performance pass and release signing remain. |
 
-**Overall implementation estimate: 83%.** This is the equal-weight mean of the ten module estimates above (83.0%). Bale/item, inventory/studio, marketplace/economy and upgrades/webshop now have full source-defined feature coverage. Cloud account sync and Android release validation remain.
+**Overall implementation estimate: 86%.** This is the equal-weight mean of the ten module estimates above (85.5%, rounded). Bale/item, inventory/studio, marketplace/economy and upgrades/webshop have full source-defined feature coverage, and the first Android debug APK has been built. Cloud account sync and Android device/release validation remain.
 
 ## Assets
 
@@ -32,12 +32,12 @@ The Android project includes the original bale image, 26 clothing images, 55 des
 ## Verification
 
 - Godot 4.7.2 headless editor import and project launch completed with the AdMob v7 plugin enabled and no script parse errors before the latest font, export-preset, bale-feedback and interstitial changes.
-- No Godot executable, Java, Android SDK or ADB is available in this environment. The latest UI and animation changes have not been validated in the editor or on device.
+- GitHub Actions successfully imported and exported the Android project and uploaded a debug APK artifact. The latest build confirms Godot project import, Android Gradle template setup and APK generation.
 - The Android AdMob v7.0 archive SHA-256 was verified against its GitHub release metadata before importing the plugin and AAR files.
 - No Android APK/AAB export or real-device test has been performed.
 
 ## Next steps
 
-1. Install/configure the Android export toolchain, then produce and test an APK/AAB on Android hardware.
-2. Connect cloud saves after configuring the Firebase Android app and authentication client.
-3. Complete the visual and performance review on Android hardware.
+1. Install the debug APK on Android hardware and check launch, navigation, ads and saved progress.
+2. Configure the Firebase Android app and authentication client, then connect cloud saves.
+3. Complete the visual/performance review and prepare a signed release build.

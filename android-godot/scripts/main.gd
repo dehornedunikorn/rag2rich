@@ -76,6 +76,11 @@ var selected_lighting := 50.0
 var selected_backdrop_quality := 30.0
 var photo_preview_panel: PanelContainer
 var photo_quality_label: Label
+var timing_is_iron := false
+var timing_safe_zone: ColorRect
+var timing_heat_zone: ColorRect
+var timing_heat_fill: ColorRect
+var timing_marker: ColorRect
 var admob: Node
 var ad_spacer: Control
 var ad_overlay: Control
@@ -839,12 +844,24 @@ func _make_inventory_card(item: Dictionary) -> Button:
 	body.add_theme_constant_override("separation",4)
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(body)
+	var card_status := HBoxContainer.new()
+	card_status.add_theme_constant_override("separation",4)
+	card_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	body.add_child(card_status)
 	var rarity_label := Label.new()
 	rarity_label.text = rarity.capitalize()
+	rarity_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	rarity_label.add_theme_font_size_override("font_size",10)
 	rarity_label.add_theme_color_override("font_color",edge)
 	rarity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body.add_child(rarity_label)
+	card_status.add_child(rarity_label)
+	if bool(item.get("washed",false)) and bool(item.get("ironed",false)) and bool(item.get("photographed",false)):
+		var ready_label := Label.new()
+		ready_label.text = "✦"
+		ready_label.tooltip_text = "Ready to list"
+		ready_label.add_theme_color_override("font_color",Color("#63d9a1"))
+		ready_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_status.add_child(ready_label)
 	var art := TextureRect.new()
 	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -905,16 +922,70 @@ func _build_studio() -> void:
 		selected_item_id = ""
 		_build_studio()
 		return
-	var info := Label.new()
-	info.text = "%s %s\nCondition: %d%% · Photo: %d%%\nWashed: %s · Ironed: %s · Photographed: %s" % [item.emoji,item.name,int(item.condition),int(item.photo_quality),str(item.washed),str(item.ironed),str(item.photographed)]
-	info.add_theme_color_override("font_color", Color("#f5effb"))
-	content.add_child(info)
+	var item_panel := PanelContainer.new()
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = PANEL
+	panel_style.border_color = Color("#393144")
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(16)
+	panel_style.content_margin_left = 12
+	panel_style.content_margin_right = 12
+	panel_style.content_margin_top = 12
+	panel_style.content_margin_bottom = 12
+	item_panel.add_theme_stylebox_override("panel",panel_style)
+	content.add_child(item_panel)
+	var item_row := HBoxContainer.new()
+	item_row.add_theme_constant_override("separation",12)
+	item_panel.add_child(item_row)
 	var image := TextureRect.new()
-	image.custom_minimum_size = Vector2(0,180)
+	image.custom_minimum_size = Vector2(104,132)
 	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	image.texture = _item_texture(item)
-	content.add_child(image)
+	item_row.add_child(image)
+	if image.texture == null:
+		var fallback := Label.new()
+		fallback.text = str(item.emoji)
+		fallback.add_theme_font_size_override("font_size",46)
+		fallback.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		fallback.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		fallback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		image.add_child(fallback)
+	var item_details := VBoxContainer.new()
+	item_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	item_details.add_theme_constant_override("separation",6)
+	item_row.add_child(item_details)
+	var item_name := Label.new()
+	item_name.text = str(item.name)
+	item_name.add_theme_font_override("font",display_font)
+	item_name.add_theme_font_size_override("font_size",18)
+	item_details.add_child(item_name)
+	var rarity_label := Label.new()
+	var rarity := str(item.get("rarity","common"))
+	rarity_label.text = rarity.capitalize()
+	rarity_label.add_theme_color_override("font_color",_rarity_color(rarity))
+	item_details.add_child(rarity_label)
+	var condition_label := Label.new()
+	condition_label.text = "Condition · %d%%" % int(item.condition)
+	condition_label.add_theme_font_size_override("font_size",11)
+	item_details.add_child(condition_label)
+	var condition_bar := ProgressBar.new()
+	condition_bar.max_value = 100
+	condition_bar.value = float(item.condition)
+	condition_bar.custom_minimum_size.y = 8
+	condition_bar.show_percentage = false
+	item_details.add_child(condition_bar)
+	var photo_label := Label.new()
+	photo_label.text = "Photo · %d%%" % int(item.photo_quality)
+	photo_label.add_theme_font_size_override("font_size",11)
+	item_details.add_child(photo_label)
+	var photo_bar := ProgressBar.new()
+	photo_bar.max_value = 100
+	photo_bar.value = float(item.photo_quality)
+	photo_bar.custom_minimum_size.y = 8
+	photo_bar.show_percentage = false
+	item_details.add_child(photo_bar)
 	if studio_mode == "wash":
 		_build_timing_game("Wash", 0.5, 0.05 + _upgrade_bonus("washer"), 2.2)
 	elif studio_mode == "iron":
@@ -1118,21 +1189,90 @@ func _process(delta: float) -> void:
 		process_direction = 1.0
 	if is_instance_valid(timing_bar):
 		timing_bar.value = process_value * 100.0
+	_update_timing_visuals()
 
 func _build_timing_game(title: String, center: float, half_zone: float, speed: float) -> void:
 	var guidance := Label.new()
-	guidance.text = "Stop the moving marker in the green zone. Avoid the red heat zone when ironing."
+	timing_is_iron = studio_mode == "iron"
+	guidance.text = "Aim for the green band. Do not enter the red zone or the fabric will scorch." if timing_is_iron else "Stop the moving marker in the green zone to get the cleanest wash."
 	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(guidance)
-	timing_bar = ProgressBar.new()
-	timing_bar.min_value = 0
-	timing_bar.max_value = 100
-	timing_bar.value = process_value * 100.0
-	timing_bar.custom_minimum_size.y = 42
-	content.add_child(timing_bar)
+	timing_bar = null
+	var track := Control.new()
+	track.clip_contents = true
+	track.custom_minimum_size = Vector2(42,160) if timing_is_iron else Vector2(0,48)
+	if not timing_is_iron:
+		track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var track_background := ColorRect.new()
+	track_background.color = Color("#292337")
+	track_background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	track.add_child(track_background)
+	timing_safe_zone = ColorRect.new()
+	timing_safe_zone.color = Color(0.2,0.85,0.5,0.32)
+	if timing_is_iron:
+		timing_safe_zone.anchor_left = 0.0
+		timing_safe_zone.anchor_right = 1.0
+		timing_safe_zone.anchor_top = 1.0-center-half_zone
+		timing_safe_zone.anchor_bottom = 1.0-center+half_zone
+	else:
+		timing_safe_zone.anchor_left = center-half_zone
+		timing_safe_zone.anchor_right = center+half_zone
+		timing_safe_zone.anchor_top = 0.0
+		timing_safe_zone.anchor_bottom = 1.0
+	track.add_child(timing_safe_zone)
+	if timing_is_iron:
+		timing_heat_zone = ColorRect.new()
+		timing_heat_zone.color = Color(0.95,0.2,0.24,0.3)
+		timing_heat_zone.anchor_left = 0.0
+		timing_heat_zone.anchor_right = 1.0
+		timing_heat_zone.anchor_top = 0.0
+		timing_heat_zone.anchor_bottom = 0.1
+		track.add_child(timing_heat_zone)
+		timing_heat_fill = ColorRect.new()
+		timing_heat_fill.color = Color("#38bdf8")
+		timing_heat_fill.anchor_left = 0.0
+		timing_heat_fill.anchor_right = 1.0
+		timing_heat_fill.anchor_top = 1.0-process_value
+		timing_heat_fill.anchor_bottom = 1.0
+		track.add_child(timing_heat_fill)
+	else:
+		timing_heat_zone = null
+		timing_heat_fill = null
+	timing_marker = ColorRect.new()
+	timing_marker.color = Color.WHITE
+	if timing_is_iron:
+		timing_marker.anchor_left = 0.0
+		timing_marker.anchor_right = 1.0
+		timing_marker.anchor_top = 1.0-process_value
+		timing_marker.anchor_bottom = 1.0-process_value
+		timing_marker.offset_top = -2.0
+		timing_marker.offset_bottom = 2.0
+	else:
+		timing_marker.anchor_left = process_value
+		timing_marker.anchor_right = process_value
+		timing_marker.anchor_top = 0.0
+		timing_marker.anchor_bottom = 1.0
+		timing_marker.offset_left = -4.0
+		timing_marker.offset_right = 4.0
+	track.add_child(timing_marker)
+	content.add_child(track)
 	var stop := _action_button("STOP %s · %.0f%%" % [title,process_value*100.0], false)
 	stop.pressed.connect(_finish_timing_game.bind(center,half_zone))
 	content.add_child(stop)
+	_update_timing_visuals()
+
+func _update_timing_visuals() -> void:
+	if not is_instance_valid(timing_marker):
+		return
+	if timing_is_iron:
+		timing_marker.anchor_top = 1.0-process_value
+		timing_marker.anchor_bottom = 1.0-process_value
+		if is_instance_valid(timing_heat_fill):
+			timing_heat_fill.anchor_top = 1.0-process_value
+			timing_heat_fill.color = Color("#38bdf8") if process_value < 0.4 else (Color("#facc15") if process_value < 0.6 else (Color("#fb923c") if process_value < 0.85 else Color("#ef4444")))
+	else:
+		timing_marker.anchor_left = process_value
+		timing_marker.anchor_right = process_value
 
 func _finish_timing_game(center: float, half_zone: float) -> void:
 	var item := _selected_item()

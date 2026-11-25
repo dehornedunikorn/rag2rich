@@ -22,4 +22,4 @@ The original gameplay, copy, balance values and visual assets are defined in the
 
 Android builds use the Godot AdMob v7 plugin. Development builds use Google's test app/ad IDs; the Admob node must be switched to real IDs in the release configuration before production. The game editor includes a five-second preview flow for reward testing without showing a real ad.
 
-The Android build toolchain is not available in this environment, so APK export and device validation are still pending. Cloud account sync, a UMP privacy-options entry point and final visual review also need follow-up. See [PORT_STATUS.md](PORT_STATUS.md) for module percentages and verification notes, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party licenses.
+The Android build toolchain is not available in this environment, so APK export and device validation are still pending. Cloud account sync and final device visual review need follow-up. See [PORT_STATUS.md](PORT_STATUS.md) for module percentages and verification notes, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party licenses.

@@ -33,6 +33,12 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 - Reset: reset removes both savegame.cfg and savegame.bak before writing fresh defaults, and the next save skips copying pre-reset state into the backup.
 - Rewarded-ad input: the full-screen overlay now ignores pointer/touch input itself, allowing the game controls underneath to receive taps while its child reward buttons remain interactive.
 - Rewarded-ad availability: Magic Laundry and timed reward buttons are offered only when the editor preview is available or Android ad consent is ready. Consent success/failure refreshes the Studio entry point, and an unsuccessful load or a dismissed ad restores the short-lived timed offer rather than leaving it hidden until the next long interval.
+- Marketplace refresh: ordinary 2.5-second sale ticks no longer rebuild the entire Market screen when no sale occurs. A sale refreshes the listing data while restoring the prior scroll position; timed listing gifts use the same scroll-preserving refresh.
+- Studio navigation: leaving Studio for another main tab clears the selected item and timing mode, and the timing minigame stops advancing whenever Studio is not the active screen.
+- Reward UI updates: consent/availability callbacks now update the Magic Laundry button visibility directly instead of rebuilding the whole Studio screen. The button is created consistently and tracks current ad availability.
+- Consent callback guard: a consent form that finishes loading after advertising has been disabled is no longer displayed.
+- Interstitial retry: a failed interstitial load schedules a retry after 30 seconds instead of waiting for the full 10-minute display interval.
+- Ad cleanup: disabling ads checks the plugin's actual loaded-ad cache before hiding/removing banner, interstitial or rewarded ads, avoiding remove calls for nonexistent ads.
 - Verification caveat: the source changes have been statically inspected. The push triggered the Android GitHub Actions import/startup/APK workflow; its result is tracked on the branch. No physical Android device test has been run. The dedicated UMP privacy-options UI remains unimplemented because the installed Cengiz AdMob v7 wrapper exposes reset_consent_info() (documented as a testing/debugging operation) but no show_privacy_options_form() API; do not use the testing reset as a production consent-revocation mechanism.
 
 ## Assets
@@ -40,6 +46,8 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 The Android project includes the original bale image, 26 clothing images, 55 designer images and a 60-item designer catalog exported from the web project. No substitute assets were created or introduced. Five designer data IDs have no matching image filename in the source asset folder; the Godot catalog uses their original emoji fallback.
 
 ## Verification
+
+- Latest follow-up fixes were pushed to `android-godot-rebuild`; they have not yet been validated by a fresh Godot headless import, APK export or physical-device test. The GitHub Actions workflow is expected to run on the new branch commits; check the run result before treating the build as verified.
 
 - Godot 4.7.2 headless editor import and project launch completed with the AdMob v7 plugin enabled and no script parse errors before the latest font, export-preset, bale-feedback and interstitial changes.
 - GitHub Actions successfully imported and exported the Android project and uploaded a debug APK artifact. The latest build confirms Godot project import, Android Gradle template setup and APK generation.

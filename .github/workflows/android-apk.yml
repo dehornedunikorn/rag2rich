@@ -73,9 +73,15 @@ jobs:
           EOF
 
       - name: Import project and launch main scene
+        shell: bash
         run: |
-          "$GODOT_BIN" --headless --editor --path android-godot --quit
-          "$GODOT_BIN" --headless --path android-godot --quit-after 3
+          set -o pipefail
+          "$GODOT_BIN" --headless --editor --path android-godot --quit 2>&1 | tee /tmp/godot-import.log
+          "$GODOT_BIN" --headless --path android-godot --quit-after 3 2>&1 | tee /tmp/godot-startup.log
+          if grep -E "SCRIPT ERROR:|Failed to load script" /tmp/godot-import.log /tmp/godot-startup.log; then
+            echo "Godot main scene reported a script error."
+            exit 1
+          fi
 
       - name: Install Android Gradle template and export APK
         run: |

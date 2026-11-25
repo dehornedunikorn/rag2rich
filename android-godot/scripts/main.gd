@@ -1041,7 +1041,7 @@ func _tick_market() -> void:
 		var boost := int(total_sales / 100) - old_milestone
 		reputation = maxf(0.5,reputation - boost * 0.01)
 		_update_coins()
-		_save_game()
+	_save_game()
 	if current_screen == "market":
 		_show_screen("market")
 

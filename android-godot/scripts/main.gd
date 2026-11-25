@@ -59,6 +59,7 @@ var bale_hint_label: Label
 var bale_rarity_label: Label
 var bale_progress_bar: ProgressBar
 var bale_reveal_progress: ProgressBar
+var bale_tap_tween: Tween
 var bale_texture: Texture2D
 var item_textures: Dictionary = {}
 var designer_items: Array[Dictionary] = []
@@ -670,9 +671,35 @@ func _update_active_bale_display() -> void:
 func _animate_bale_tap() -> void:
 	if not is_instance_valid(bale_tap_button):
 		return
+	if bale_tap_tween != null and bale_tap_tween.is_running():
+		bale_tap_tween.kill()
+	bale_tap_button.scale = Vector2.ONE
+	bale_tap_tween = create_tween()
+	bale_tap_tween.tween_property(bale_tap_button,"scale",Vector2(0.97,0.97),0.05)
+	bale_tap_tween.tween_property(bale_tap_button,"scale",Vector2.ONE,0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+func _spawn_bale_pop(text: String) -> void:
+	if not is_instance_valid(bale_tap_button):
+		return
+	var pop := Label.new()
+	pop.text = text
+	pop.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pop.add_theme_font_size_override("font_size",30)
+	pop.add_theme_color_override("font_color",Color.WHITE)
+	pop.add_theme_color_override("font_shadow_color",Color.BLACK)
+	pop.add_theme_constant_override("shadow_offset_x",2)
+	pop.add_theme_constant_override("shadow_offset_y",2)
+	pop.set_anchors_preset(Control.PRESET_CENTER)
+	pop.position = Vector2(-55,-18)
+	pop.size = Vector2(110,42)
+	pop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bale_tap_button.add_child(pop)
 	var tween := create_tween()
-	tween.tween_property(bale_tap_button,"scale",Vector2(0.97,0.97),0.05)
-	tween.tween_property(bale_tap_button,"scale",Vector2.ONE,0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.set_parallel(true)
+	tween.tween_property(pop,"position",pop.position+Vector2(0,-52),0.7).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pop,"modulate:a",0.0,0.7)
+	tween.set_parallel(false)
+	tween.tween_callback(pop.queue_free)
 
 func _rarity_color(rarity: String) -> Color:
 	match rarity:
@@ -702,6 +729,7 @@ func _click_bale() -> void:
 	if active_bale.is_empty() or _occupied() >= _capacity():
 		return
 	_animate_bale_tap()
+	var was_revealing := not active_bale.current.is_empty()
 	if active_bale.current.is_empty():
 		if active_bale.remaining <= 0.05:
 			active_bale.clear()
@@ -722,6 +750,8 @@ func _click_bale() -> void:
 		active_bale.current = current
 		_save_game()
 		_update_active_bale_display()
+		if was_revealing:
+			_spawn_bale_pop("✨")
 		return
 	var t: Dictionary = current.template
 	var variants := _variant_count(str(t.kind))
@@ -729,7 +759,7 @@ func _click_bale() -> void:
 		"id":str(Time.get_unix_time_from_system())+"-"+str(randi()),
 		"kind":t.kind,"variant":randi_range(0,variants-1),"name":t.name,"emoji":t.emoji,
 		"weight":t.weight,"base_value":t.value,"rarity":t.rarity,
-		"condition":randf_range(25.0,50.0),"photo_quality":0.0,
+		"condition":25.0+randf()*25.0,"photo_quality":0.0,
 		"washed":false,"ironed":false,"photographed":false
 	}
 	inventory.append(item)
@@ -742,6 +772,7 @@ func _click_bale() -> void:
 		_show_screen("dashboard")
 	else:
 		_update_active_bale_display()
+		_spawn_bale_pop("+%s" % str(t.emoji))
 	_show_reward_notice("Found %s · %.1f kg · %s" % [item.name,item.weight,str(item.rarity).capitalize()])
 
 func _variant_count(kind: String) -> int:

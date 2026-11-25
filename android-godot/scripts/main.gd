@@ -576,6 +576,7 @@ func _sell_random_listings(amount: int) -> void:
 	_show_reward_notice("Golden Register · %d sold · +%d coins" % [sold,earned])
 
 func _show_screen(screen: String) -> void:
+	magic_laundry_button = null
 	if current_screen == "studio" and screen != "studio" and screen != "gallery":
 		selected_item_id = ""
 		studio_mode = "menu"
@@ -1268,7 +1269,7 @@ func _process(delta: float) -> void:
 			if randf() < 0.05:
 				gift_open = true
 				if pending_market_item_id == "":
-					_show_screen("market")
+					_refresh_market_screen()
 		if market_timer >= 2.5:
 			market_timer = 0.0
 			_tick_market()

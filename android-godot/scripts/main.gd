@@ -1073,7 +1073,12 @@ func _build_market() -> void:
 			price.max_value = int(item.base_value) * 3
 			price.value = maxf(5.0,round(float(item.base_value) * (float(item.condition) / 100.0) * (0.7 + float(item.photo_quality) / 100.0 * 0.6)))
 			content.add_child(price)
-			var list := _action_button("List %s for %d coins" % [item.name,int(price.value)], false)
+			var quote := Label.new()
+			quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			content.add_child(quote)
+			var list := _action_button("Confirm listing", false)
+			price.value_changed.connect(_update_listing_quote.bind(list,quote,item))
+			_update_listing_quote(price.value,list,quote,item)
 			list.pressed.connect(_list_item.bind(str(item.id),price))
 			content.add_child(list)
 		var cancel := _action_button("Cancel", false)
@@ -1114,6 +1119,14 @@ func _prepare_listing(id: String) -> void:
 	pending_market_item_id = id
 	_show_screen("market")
 
+func _update_listing_quote(price: float, action: Button, quote: Label, item: Dictionary) -> void:
+	var ratio := float(item.base_value) / maxf(1.0,price)
+	var fairness := "Fair price" if ratio > 0.85 else ("Pricey · slower sale" if ratio > 0.55 else "Overpriced · slow sale")
+	var color := Color("#69d89a") if ratio > 0.85 else (Color("#f1c75b") if ratio > 0.55 else Color("#ee747d"))
+	quote.text = "%s · base value %d coins" % [fairness,int(item.base_value)]
+	quote.add_theme_color_override("font_color",color)
+	action.text = "List for %d coins" % int(price)
+
 func _inventory_item(id: String) -> Dictionary:
 	for item in inventory:
 		if str(item.id) == id:
@@ -1123,20 +1136,24 @@ func _inventory_item(id: String) -> Dictionary:
 func _list_item(id: String, price_control: SpinBox) -> void:
 	var item := _inventory_item(id)
 	if item.is_empty() or _occupied() > _capacity():
+		_show_reward_notice("This item can no longer be listed")
 		return
 	var use_free := free_uploads > 0
 	var fee := 0 if use_free or webshop_unlocked else 5
 	if coins < fee:
+		_show_reward_notice("Need %d coins for the listing fee" % fee)
 		return
 	coins -= fee
 	if use_free:
 		free_uploads -= 1
-	listings.append({"id":str(Time.get_unix_time_from_system())+str(randi()),"item":item.duplicate(true),"price":int(price_control.value),"ticks":0})
+	var price := clampi(int(price_control.value),1,maxi(1,int(item.base_value)*3))
+	listings.append({"id":str(Time.get_unix_time_from_system())+str(randi()),"item":item.duplicate(true),"price":price,"listed_at":Time.get_unix_time_from_system(),"ticks":0})
 	inventory.erase(item)
 	_save_game()
 	pending_market_item_id = ""
 	_update_coins()
 	_show_screen("market")
+	_show_reward_notice("Listed %s for %d coins" % [str(item.name),price])
 
 func _cancel_pending_listing() -> void:
 	pending_market_item_id = ""
@@ -1145,10 +1162,12 @@ func _cancel_pending_listing() -> void:
 func _unlist_item(id: String) -> void:
 	for listing in listings:
 		if str(listing.id) == id:
+			var returned_name := str(listing.item.name)
 			inventory.append(listing.item)
 			listings.erase(listing)
 			_save_game()
 			_show_screen("market")
+			_show_reward_notice("Listing pulled · %s returned to Closet" % returned_name)
 			return
 
 func _tick_market() -> void:
@@ -1189,6 +1208,7 @@ func _claim_market_gift() -> void:
 	gift_open = false
 	_save_game()
 	_show_screen("market")
+	_show_reward_notice("Marketplace Gift · 5 free listings")
 
 func _unlock_webshop() -> void:
 	if webshop_unlocked or coins < 5000 or _reputation_pct() < 30.0:
@@ -1198,6 +1218,7 @@ func _unlock_webshop() -> void:
 	_save_game()
 	_update_coins()
 	_show_screen(current_screen)
+	_show_reward_notice("Webshop unlocked · free listings and faster sales")
 
 func _reputation_pct() -> float:
 	return (1.0 - (reputation - 0.5) / 0.5) * 100.0

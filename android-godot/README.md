@@ -12,7 +12,7 @@ The original gameplay, copy, balance values and visual assets are defined in the
 - Five original navigation destinations: Unbox, Closet, Studio, Market and Shop.
 - Bale purchase and tap-to-reveal loop with original clothing images.
 - Closet and Studio image-card grids, wash/iron timing games, live photo composition and equipment upgrades.
-- Marketplace listings, fees, saved sale rolls, reputation, gifts and webshop unlock.
+- Marketplace listings with live price guidance, fees, saved sale rolls, reputation, gifts and webshop unlock.
 - Versioned local saves with backup recovery, plus the original 60-piece designer catalog.
 - AdMob banner/rewarded-ad wiring, EEA consent flow and rewarded game actions.
 - Sequential storage progression, confirmed progress reset and Android back navigation through nested screens.

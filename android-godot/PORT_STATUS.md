@@ -20,10 +20,10 @@ Percentages estimate the portion of each module implemented in Godot. Audit work
 | Marketplace and economy | 100% | Source-matched listing fee and suggested price, live fair/pricey/overpriced quote, market sale probability/ticks, reputation milestones, five-upload gifts, webshop fee/speed bonuses, pull/unlist flow and rewarded five-listing sales are implemented. Android device QA is tracked in the build/release module. |
 | Upgrades and webshop | 83% | Sequential storage tiers, all three equipment tracks, source prices/effects, webshop unlock and confirmed progress reset are implemented. Progression balance and device validation remain. |
 | Save / cloud / offline progression | 85% | Versioned local ConfigFile saves cover game state and listing ticks; save loads validate values and recover from a backup file. Cloud sync and offline market progression remain unimplemented. |
-| AdMob and GDPR/UMP | 80% | Godot AdMob v7 is integrated with test IDs by default, startup UMP consent, banner and rewarded ads, all three reward actions, and source-matched 10-minute interstitials. A dedicated privacy-options entry point and Android/device ad validation remain. |
+| AdMob and GDPR/UMP | 85% | Godot AdMob v7 is integrated with test IDs by default, startup and user-accessible Shop-screen UMP consent, banner and rewarded ads, all three reward actions, and source-matched 10-minute interstitials. Android/device ad validation remains. |
 | Android build, optimization and release tests | 15% | A Gradle Android debug APK preset is configured for package `com.ragtorich.game`, ARM64 and target API 36. Godot can import and launch the project, but no JDK/Android SDK/ADB is available here, so APK export, Android device test, performance pass and release check remain. |
 
-**Overall implementation estimate: 77%.** This is the equal-weight mean of the ten module estimates above (77.3%, rounded). All modules that can be advanced without the unavailable Android toolchain or external cloud credentials are now at or above 80%; the Android build and release module remains below that threshold. Cloud sync, a UMP privacy-options entry point and Android release validation remain.
+**Overall implementation estimate: 78%.** This is the equal-weight mean of the ten module estimates above (77.8%, rounded). All modules that can be advanced without the unavailable Android toolchain or external cloud credentials are now at or above 80%; the Android build and release module remains below that threshold. Cloud sync and Android release validation remain.
 
 ## Assets
 
@@ -39,6 +39,6 @@ The Android project includes the original bale image, 26 clothing images, 55 des
 ## Next steps
 
 1. Install/configure the Android export toolchain, then produce and test an APK/AAB on Android hardware.
-2. Add a user-accessible UMP privacy-options entry point and validate consent on device.
+2. Validate consent on device.
 3. Audit and tune bale, storage and marketplace progression together.
 4. Complete the visual, performance and release validation passes.

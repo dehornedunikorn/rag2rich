@@ -1473,6 +1473,18 @@ func _build_shop() -> void:
 	var reset := _action_button("Reset all progress", false)
 	reset.pressed.connect(_confirm_reset_progress)
 	content.add_child(reset)
+	if OS.has_feature("android"):
+		var privacy_options := _action_button("Privacy options", false)
+		privacy_options.pressed.connect(_open_privacy_options)
+		content.add_child(privacy_options)
+
+func _open_privacy_options() -> void:
+	if admob == null or not OS.has_feature("android"):
+		return
+	if bool(admob.call("is_consent_form_available")):
+		admob.call("show_consent_form")
+	else:
+		admob.call("load_consent_form")
 
 func _buy_equipment(key: String, cost: int) -> void:
 	if int(upgrade_levels.get(key,0)) >= 3 or coins < cost:

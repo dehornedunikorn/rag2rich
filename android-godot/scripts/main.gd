@@ -40,6 +40,13 @@ var content: VBoxContainer
 var coin_label: Label
 var bale_texture: Texture2D
 var item_textures: Dictionary = {}
+var upgrade_levels := {"washer":0,"iron":0,"lights":0}
+var selected_item_id := ""
+var studio_mode := "menu"
+var process_value := 0.0
+var process_direction := 1.0
+var timing_bar: ProgressBar
+var light_slider: HSlider
 
 func _ready() -> void:
 	bale_texture = load("res://assets/bale.png")
@@ -96,7 +103,7 @@ func _show_screen(screen: String) -> void:
 	match screen:
 		"dashboard": _build_dashboard()
 		"inventory": _build_inventory()
-		"studio": _build_placeholder("Processing Studio","Pick an item from your closet to wash, iron and photograph.")
+		"studio": _build_studio()
 		"market": _build_placeholder("Marketplace","Your prepared listings and sales will appear here.")
 		"shop": _build_shop()
 	for i in bottom_bar.get_child_count():
@@ -235,14 +242,188 @@ func _build_inventory() -> void:
 			card.expand_icon = true
 		content.add_child(card)
 
+func _build_studio() -> void:
+	_heading("Processing Studio", "Choose an item and prepare it for the marketplace.")
+	if selected_item_id == "":
+		for item in inventory:
+			var button := Button.new()
+			button.text = "%s %s · %d%% · %s" % [item.emoji,item.name,int(item.condition),"Ready" if item.washed and item.ironed and item.photographed else "In progress"]
+			button.custom_minimum_size.y = 76
+			var texture := _item_texture(item)
+			if texture:
+				button.icon = texture
+				button.expand_icon = true
+			button.pressed.connect(_select_studio_item.bind(str(item.id)))
+			content.add_child(button)
+		return
+	var item := _selected_item()
+	if item.is_empty():
+		selected_item_id = ""
+		_build_studio()
+		return
+	var info := Label.new()
+	info.text = "%s %s\nCondition: %d%% · Photo: %d%%\nWashed: %s · Ironed: %s · Photographed: %s" % [item.emoji,item.name,int(item.condition),int(item.photo_quality),str(item.washed),str(item.ironed),str(item.photographed)]
+	info.add_theme_color_override("font_color", Color("#f5effb"))
+	content.add_child(info)
+	var image := TextureRect.new()
+	image.custom_minimum_size = Vector2(0,180)
+	image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	image.texture = _item_texture(item)
+	content.add_child(image)
+	if studio_mode == "wash":
+		_build_timing_game("Wash", 0.5, 0.05 + _upgrade_bonus("washer"), 2.2)
+	elif studio_mode == "iron":
+		_build_timing_game("Iron", 0.72, 0.045 + _upgrade_bonus("iron") / 300.0, 1.4)
+	elif studio_mode == "photo":
+		_build_photo_mode(item)
+	else:
+		var wash := _action_button("Wash", item.washed or studio_mode != "menu")
+		wash.pressed.connect(_start_studio_mode.bind("wash"))
+		content.add_child(wash)
+		var iron := _action_button("Iron", not item.washed or item.ironed or studio_mode != "menu")
+		iron.pressed.connect(_start_studio_mode.bind("iron"))
+		content.add_child(iron)
+		var photo := _action_button("Photo", item.photographed or studio_mode != "menu")
+		photo.pressed.connect(_start_studio_mode.bind("photo"))
+		content.add_child(photo)
+	var back := _action_button("Back to items", false)
+	back.pressed.connect(_clear_studio_selection)
+	content.add_child(back)
+
+func _action_button(label: String, disabled: bool) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.custom_minimum_size.y = 56
+	button.disabled = disabled
+	return button
+
+func _selected_item() -> Dictionary:
+	for item in inventory:
+		if str(item.id) == selected_item_id:
+			return item
+	return {}
+
+func _select_studio_item(id: String) -> void:
+	selected_item_id = id
+	studio_mode = "menu"
+	_show_screen("studio")
+
+func _clear_studio_selection() -> void:
+	selected_item_id = ""
+	studio_mode = "menu"
+	_show_screen("studio")
+
+func _start_studio_mode(mode: String) -> void:
+	studio_mode = mode
+	process_value = 0.0
+	process_direction = 1.0
+	_show_screen("studio")
+
+func _process(delta: float) -> void:
+	if studio_mode != "wash" and studio_mode != "iron":
+		return
+	process_value += process_direction * delta * (2.2 if studio_mode == "wash" else 1.4)
+	if process_value >= 1.0:
+		process_value = 1.0
+		process_direction = -1.0
+	elif process_value <= 0.0:
+		process_value = 0.0
+		process_direction = 1.0
+
+func _build_timing_game(title: String, center: float, half_zone: float, speed: float) -> void:
+	var guidance := Label.new()
+	guidance.text = "Stop the moving marker in the green zone. Avoid the red heat zone when ironing."
+	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(guidance)
+	timing_bar = ProgressBar.new()
+	timing_bar.min_value = 0
+	timing_bar.max_value = 100
+	timing_bar.value = process_value * 100.0
+	timing_bar.custom_minimum_size.y = 42
+	content.add_child(timing_bar)
+	var stop := _action_button("STOP %s · %.0f%%" % [title,process_value*100.0], false)
+	stop.pressed.connect(_finish_timing_game.bind(center,half_zone))
+	content.add_child(stop)
+
+func _finish_timing_game(center: float, half_zone: float) -> void:
+	var item := _selected_item()
+	if item.is_empty():
+		return
+	var in_zone := absf(process_value-center) <= half_zone
+	if studio_mode == "wash":
+		var gain := maxf(15.0,45.0-absf(process_value-center)*220.0) if in_zone else 2.0
+		item.condition = minf(100.0,float(item.condition)+gain)
+		item.washed = true
+	else:
+		var burned := process_value > 0.9
+		var gain := -12.0 if burned else (maxf(12.0,35.0-absf(process_value-center)*240.0)+_upgrade_bonus("iron") if in_zone else 1.0)
+		item.condition = clampf(float(item.condition)+gain,0.0,100.0)
+		item.ironed = true
+	studio_mode = "menu"
+	_show_screen("studio")
+
+func _upgrade_bonus(key: String) -> float:
+	var level := clampi(int(upgrade_levels.get(key,0)),0,3)
+	if key == "washer":
+		return [0.0,0.04,0.08,0.14][level]
+	if key == "iron":
+		return [0.0,5.0,12.0,22.0][level]
+	return 0.0
+
+func _lights_cap() -> float:
+	return [60.0,75.0,90.0,100.0][clampi(int(upgrade_levels.lights),0,3)]
+
+func _build_photo_mode(item: Dictionary) -> void:
+	var title := Label.new()
+	title.text = "Backdrop and lighting · cap %d%%" % int(_lights_cap())
+	content.add_child(title)
+	var light_slider := HSlider.new()
+	light_slider.min_value = 0
+	light_slider.max_value = 100
+	light_slider.value = 50
+	light_slider.custom_minimum_size.y = 42
+	content.add_child(light_slider)
+	for backdrop in [{"id":"white","quality":30.0},{"id":"studio","quality":60.0},{"id":"nature","quality":80.0},{"id":"neon","quality":95.0}]:
+		var choice := _action_button("%s backdrop · estimated %d%%" % [str(backdrop.id).capitalize(),int(minf(_lights_cap(),float(backdrop.quality)*0.6+50.0*0.4))], false)
+		choice.pressed.connect(_take_photo.bind(float(backdrop.quality),float(light_slider.value),str(item.id)))
+		content.add_child(choice)
+
+func _take_photo(backdrop_quality: float, lighting: float, item_id: String) -> void:
+	for item in inventory:
+		if str(item.id) == item_id:
+			item.photo_quality = minf(_lights_cap(),backdrop_quality*0.6+lighting*0.4)
+			item.photographed = true
+	studio_mode = "menu"
+	_show_screen("studio")
+
 func _build_shop() -> void:
-	_heading("Shop","Storage upgrades")
+	_heading("Shop", "Storage and equipment upgrades.")
 	for tier in ["room","garage","container"]:
-		var card := Button.new()
-		card.text = "%s storage · %d slots · %d coins" % [tier.capitalize(),STORAGE_CAPACITY[tier],STORAGE_COST[tier]]
-		card.disabled = coins < STORAGE_COST[tier] or _tier_rank(tier) <= _tier_rank(storage_tier)
+		var card := _action_button("%s storage · %d slots · %d coins" % [tier.capitalize(),STORAGE_CAPACITY[tier],STORAGE_COST[tier]], coins < STORAGE_COST[tier] or _tier_rank(tier) <= _tier_rank(storage_tier))
 		card.pressed.connect(_buy_storage.bind(tier))
 		content.add_child(card)
+	var defs := [
+		{"key":"washer","name":"Washing Machine","levels":[{"label":"Hand wash","cost":0},{"label":"Basic Washer","cost":250},{"label":"Pro Washer","cost":1200},{"label":"Industrial","cost":4000}]},
+		{"key":"iron","name":"Steam Iron","levels":[{"label":"No iron","cost":0},{"label":"Basic Iron","cost":350},{"label":"Steam Iron","cost":1500},{"label":"Studio Press","cost":5000}]},
+		{"key":"lights","name":"Studio Lights","levels":[{"label":"Phone flash","cost":0},{"label":"Ring Light","cost":400},{"label":"Softbox","cost":1800},{"label":"Pro Studio","cost":6000}]}
+	]
+	for definition in defs:
+		var key: String = definition.key
+		var level := int(upgrade_levels[key])
+		var current: Dictionary = definition.levels[level]
+		var next_text := "MAX LEVEL" if level >= 3 else "%s · %d coins" % [definition.levels[level+1].label,definition.levels[level+1].cost]
+		var button := _action_button("%s · %s → %s" % [definition.name,current.label,next_text], level >= 3 or (level < 3 and coins < int(definition.levels[level+1].cost)))
+		button.pressed.connect(_buy_equipment.bind(key,int(definition.levels[level+1].cost) if level < 3 else 0))
+		content.add_child(button)
+
+func _buy_equipment(key: String, cost: int) -> void:
+	if int(upgrade_levels.get(key,0)) >= 3 or coins < cost:
+		return
+	coins -= cost
+	upgrade_levels[key] = int(upgrade_levels[key])+1
+	_update_coins()
+	_show_screen("shop")
 
 func _buy_storage(tier: String) -> void:
 	if coins < STORAGE_COST[tier]:

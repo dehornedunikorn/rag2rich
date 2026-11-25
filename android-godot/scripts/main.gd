@@ -101,6 +101,8 @@ var interstitial_show_pending := false
 var rewarded_ad_loaded := false
 var rewarded_ad_load_requested := false
 var pending_reward_slot := ""
+var ads_enabled := true
+var reset_save_pending := false
 var reward_preview_remaining := -1.0
 var reward_preview_bar: ProgressBar
 
@@ -260,6 +262,9 @@ func _on_admob_initialized(_status: Variant) -> void:
 	admob.call("update_consent_info")
 
 func _on_consent_info_updated() -> void:
+	if not ads_enabled:
+		ads_consent_ready = false
+		return
 	var consent: Variant = admob.call("get_consent_status")
 	if consent == null:
 		return
@@ -278,6 +283,9 @@ func _on_consent_form_loaded() -> void:
 	admob.call("show_consent_form")
 
 func _on_consent_form_dismissed(_error: Variant) -> void:
+	if not ads_enabled:
+		ads_consent_ready = false
+		return
 	var consent: Variant = admob.call("get_consent_status")
 	if consent != null and (int(consent.status) == 1 or int(consent.status) == 3):
 		ads_consent_ready = true
@@ -290,7 +298,7 @@ func _on_consent_form_failed(_error: Variant) -> void:
 	ads_consent_ready = false
 
 func _load_mobile_ads() -> void:
-	if not ads_consent_ready:
+	if not ads_enabled or not ads_consent_ready:
 		return
 	if not banner_ad_loaded:
 		admob.call("load_banner_ad")
@@ -302,11 +310,19 @@ func _load_mobile_ads() -> void:
 		admob.call("load_interstitial_ad")
 
 func _on_banner_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
+	if not ads_enabled or not ads_consent_ready:
+		admob.call("remove_banner_ad", ad_info.call("get_ad_id"))
+		banner_ad_loaded = false
+		return
 	banner_ad_loaded = true
 	admob.call("show_banner_ad", ad_info.call("get_ad_id"))
 
 func _on_interstitial_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	interstitial_ad_load_requested = false
+	if not ads_enabled or not ads_consent_ready:
+		admob.call("remove_interstitial_ad", ad_info.call("get_ad_id"))
+		interstitial_ad_loaded = false
+		return
 	interstitial_ad_loaded = true
 	if interstitial_show_pending and pending_reward_slot == "":
 		interstitial_show_pending = false
@@ -328,6 +344,10 @@ func _on_interstitial_ad_failed_to_show(_ad_info: Variant, _error: Variant) -> v
 
 func _on_rewarded_ad_loaded(ad_info: Variant, _response_info: Variant) -> void:
 	rewarded_ad_load_requested = false
+	if not ads_enabled or not ads_consent_ready:
+		admob.call("remove_rewarded_ad", ad_info.call("get_ad_id"))
+		rewarded_ad_loaded = false
+		return
 	rewarded_ad_loaded = true
 	if pending_reward_slot != "":
 		admob.call("show_rewarded_ad", ad_info.call("get_ad_id"))
@@ -447,7 +467,7 @@ func _request_reward(slot: String) -> void:
 		var preview: Control = ad_overlay.get_meta("preview")
 		preview.visible = true
 		return
-	if not OS.has_feature("android") or not ads_consent_ready:
+	if not OS.has_feature("android") or not ads_enabled or not ads_consent_ready:
 		pending_reward_slot = ""
 		_show_reward_notice("Ads are not ready on this device")
 		return
@@ -1135,7 +1155,7 @@ func _start_studio_mode(mode: String) -> void:
 	_show_screen("studio")
 
 func _process(delta: float) -> void:
-	if OS.has_feature("android") and ads_consent_ready and pending_reward_slot == "":
+	if OS.has_feature("android") and ads_enabled and ads_consent_ready and pending_reward_slot == "":
 		interstitial_elapsed += delta
 		if interstitial_elapsed >= INTERSTITIAL_INTERVAL:
 			interstitial_elapsed = 0.0
@@ -1573,12 +1593,18 @@ func _save_game() -> void:
 	save.set_value("game", "active_bale", active_bale)
 	save.set_value("game", "upgrade_levels", upgrade_levels)
 	save.set_value("game", "discovered_designers", discovered_designers)
+	save.set_value("settings", "ads_enabled", ads_enabled)
 	var current_path := ProjectSettings.globalize_path("user://savegame.cfg")
 	var backup_path := ProjectSettings.globalize_path("user://savegame.bak")
 	var existing := ConfigFile.new()
-	if FileAccess.file_exists("user://savegame.cfg") and existing.load("user://savegame.cfg") == OK:
+	if reset_save_pending:
+		if FileAccess.file_exists("user://savegame.bak"):
+			DirAccess.remove_absolute(backup_path)
+	elif FileAccess.file_exists("user://savegame.cfg") and existing.load("user://savegame.cfg") == OK:
 		DirAccess.copy_absolute(current_path,backup_path)
-	save.save("user://savegame.cfg")
+	var save_result := save.save("user://savegame.cfg")
+	if save_result == OK:
+		reset_save_pending = false
 
 func _load_game() -> void:
 	var save := ConfigFile.new()
@@ -1589,6 +1615,7 @@ func _load_game() -> void:
 		save = backup
 	if int(save.get_value("game","schema_version",0)) > SAVE_VERSION:
 		return
+	ads_enabled = bool(save.get_value("settings", "ads_enabled", true))
 	coins = maxi(0,int(save.get_value("game", "coins", coins)))
 	total_sales = maxi(0,int(save.get_value("game", "total_sales", total_sales)))
 	reputation = clampf(float(save.get_value("game", "reputation", reputation)),0.5,1.0)
@@ -1656,17 +1683,51 @@ func _build_shop() -> void:
 	reset.pressed.connect(_confirm_reset_progress)
 	content.add_child(reset)
 	if OS.has_feature("android"):
-		var privacy_options := _action_button("Privacy options", false)
-		privacy_options.pressed.connect(_open_privacy_options)
-		content.add_child(privacy_options)
+		var ads_preference := _action_button("Advertising: %s" % ("Enabled · tap to turn off" if ads_enabled else "Disabled · tap to turn on"), false)
+		ads_preference.pressed.connect(_toggle_ads_preference)
+		content.add_child(ads_preference)
 
-func _open_privacy_options() -> void:
-	if admob == null or not OS.has_feature("android"):
-		return
-	if bool(admob.call("is_consent_form_available")):
-		admob.call("show_consent_form")
+func _toggle_ads_preference() -> void:
+	if ads_enabled:
+		var dialog := ConfirmationDialog.new()
+		dialog.title = "Turn off advertising?"
+		dialog.dialog_text = "This stops banner, interstitial and rewarded ads on this device. The installed AdMob plugin does not expose Google's dedicated UMP privacy-options form, so this app-level switch does not erase the UMP consent record."
+		dialog.confirmed.connect(func():
+			_set_ads_enabled(false)
+			dialog.queue_free()
+			_show_screen("shop")
+		)
+		dialog.canceled.connect(dialog.queue_free)
+		add_child(dialog)
+		dialog.popup_centered()
 	else:
-		admob.call("load_consent_form")
+		_set_ads_enabled(true)
+		if admob != null and OS.has_feature("android"):
+			admob.call("update_consent_info")
+		_show_screen("shop")
+
+func _set_ads_enabled(enabled: bool) -> void:
+	ads_enabled = enabled
+	if not ads_enabled:
+		ads_consent_ready = false
+		interstitial_show_pending = false
+		pending_reward_slot = ""
+		reward_preview_remaining = -1.0
+		banner_ad_loaded = false
+		interstitial_ad_loaded = false
+		interstitial_ad_load_requested = false
+		rewarded_ad_loaded = false
+		rewarded_ad_load_requested = false
+		if is_instance_valid(register_ad_button):
+			register_ad_button.visible = false
+		if is_instance_valid(designer_ad_button):
+			designer_ad_button.visible = false
+		if admob != null and OS.has_feature("android"):
+			admob.call("hide_banner_ad")
+			admob.call("remove_banner_ad")
+			admob.call("remove_interstitial_ad")
+			admob.call("remove_rewarded_ad")
+	_save_game()
 
 func _buy_equipment(key: String, cost: int) -> void:
 	if int(upgrade_levels.get(key,0)) >= 3 or coins < cost:
@@ -1714,6 +1775,13 @@ func _reset_progress() -> void:
 	selected_designer_id = ""
 	pending_market_item_id = ""
 	gift_open = false
+	reset_save_pending = true
+	var current_save_path := ProjectSettings.globalize_path("user://savegame.cfg")
+	var backup_save_path := ProjectSettings.globalize_path("user://savegame.bak")
+	if FileAccess.file_exists("user://savegame.cfg"):
+		DirAccess.remove_absolute(current_save_path)
+	if FileAccess.file_exists("user://savegame.bak"):
+		DirAccess.remove_absolute(backup_save_path)
 	_save_game()
 	_update_coins()
 	_show_screen("dashboard")
